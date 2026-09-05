@@ -1,0 +1,1 @@
+-keep class com.claude.messages.data.db.** { *; }
