@@ -99,10 +99,22 @@ nowhere to store — rules, pins, archives, mutes, drafts — lives in Room.
 
 ```bash
 ./gradlew assembleDebug     # APK at app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest # 23 unit tests covering the rule engine
+./gradlew testDebugUnitTest # 30 unit tests covering the rule engine and number matching
 ```
 
 Requires JDK 17+ and Android SDK 34.
+
+## Installing from an APK
+
+Android 13+ blocks apps installed from an APK — rather than from a store — from
+taking sensitive roles such as the default SMS handler, and shows *"App was
+denied access to be default SMS app"*. To allow it:
+
+**Settings → Apps → Messages → ⋮ → Allow restricted settings**, then return to
+the app and tap *Set as default*. The menu item only appears after the app has
+been denied once. Installing with `adb install` bypasses the guard entirely.
+
+The app's setup card links straight to this, with the steps spelled out.
 
 ## Permissions
 

@@ -51,7 +51,6 @@ data class NewMessageUiState(
 class NewMessageViewModel(app: Application) : AndroidViewModel(app) {
 
     private val contactsRepo = ServiceLocator.contactsRepository(app)
-    private val smsRepo = ServiceLocator.smsRepository(app)
 
     private val _state = MutableStateFlow(NewMessageUiState())
     val state: StateFlow<NewMessageUiState> = _state.asStateFlow()
@@ -76,14 +75,6 @@ class NewMessageViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Resolves the thread for the typed number or picked contact. */
-    fun openThreadFor(number: String, onReady: (Long) -> Unit) {
-        viewModelScope.launch {
-            val threadId = smsRepo.threadIdFor(setOf(number))
-            onReady(threadId)
-        }
-    }
-
     /** True when the query looks like a phone number the user can text directly. */
     fun queryIsDialable(): Boolean {
         val digits = _state.value.query.filter { it.isDigit() }
@@ -96,7 +87,7 @@ class NewMessageViewModel(app: Application) : AndroidViewModel(app) {
 fun NewMessageScreen(
     viewModel: NewMessageViewModel,
     onBack: () -> Unit,
-    onOpenThread: (Long) -> Unit,
+    onCompose: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -126,7 +117,7 @@ fun NewMessageScreen(
                 state.filtered.none { it.number == state.query }
             ) {
                 TextButton(
-                    onClick = { viewModel.openThreadFor(state.query.trim(), onOpenThread) },
+                    onClick = { onCompose(state.query.trim()) },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     Text("Send to ${state.query.trim()}")
@@ -147,9 +138,7 @@ fun NewMessageScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                viewModel.openThreadFor(contact.number, onOpenThread)
-                            }
+                            .clickable { onCompose(contact.number) }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

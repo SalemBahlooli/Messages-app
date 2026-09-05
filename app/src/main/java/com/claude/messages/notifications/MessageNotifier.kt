@@ -34,8 +34,6 @@ class MessageNotifier(private val context: Context) {
     private val channels = ChannelManager(context)
     private val manager = NotificationManagerCompat.from(context)
 
-    /** Conversation history kept per thread so MessagingStyle can show a transcript. */
-    private val history = mutableMapOf<Long, MutableList<Pair<String, Message>>>()
 
     @SuppressLint("MissingPermission")
     suspend fun notifyIncoming(message: Message) {
@@ -72,8 +70,11 @@ class MessageNotifier(private val context: Context) {
 
         // ---- transcript ------------------------------------------------------
         val transcript = history.getOrPut(message.threadId) { mutableListOf() }
-        transcript += senderName to message
-        while (transcript.size > MAX_HISTORY) transcript.removeAt(0)
+        val snapshot = synchronized(transcript) {
+            transcript += senderName to message
+            while (transcript.size > MAX_HISTORY) transcript.removeAt(0)
+            transcript.toList()
+        }
 
         val self = Person.Builder().setName("You").build()
         val title = if (rule == null || rule.titlePrefix.isBlank()) {
@@ -84,7 +85,7 @@ class MessageNotifier(private val context: Context) {
         val style = NotificationCompat.MessagingStyle(self)
             .setConversationTitle(title)
             .setGroupConversation(false)
-        transcript.forEach { (name, msg) ->
+        snapshot.forEach { (name, msg) ->
             val person = Person.Builder().setName(name).setKey(msg.address).build()
             style.addMessage(msg.body, msg.date, person)
         }
@@ -269,6 +270,13 @@ class MessageNotifier(private val context: Context) {
             PackageManager.PERMISSION_GRANTED
 
     companion object {
+        /**
+         * Conversation history per thread, shared across instances: receivers
+         * construct a new MessageNotifier per broadcast, so a per-instance map
+         * would leave MessagingStyle with a single message every time.
+         */
+        private val history = java.util.concurrent.ConcurrentHashMap<Long, MutableList<Pair<String, Message>>>()
+
         private const val GROUP_KEY = "com.claude.messages.MESSAGES"
         private const val SUMMARY_ID = 1_000_000
         private const val FAILURE_ID_BASE = 2_000_000

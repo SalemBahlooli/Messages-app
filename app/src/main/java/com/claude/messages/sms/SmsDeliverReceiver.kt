@@ -31,28 +31,31 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val timestamp = parts.first().timestampMillis.takeIf { it > 0 }
             ?: System.currentTimeMillis()
         val subId = intent.getIntExtra("subscription", -1)
+        if (address.isBlank() || body.isEmpty()) return
 
         val pendingResult = goAsync()
         val app = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val repo = ServiceLocator.smsRepository(app)
-                val uri = repo.insertIncoming(address, body, timestamp, subId)
-                if (uri == null) {
+                val stored = ServiceLocator.smsRepository(app)
+                    .insertIncoming(address, body, timestamp, subId)
+                if (stored == null) {
                     Log.w(TAG, "Could not persist incoming message")
                     return@launch
                 }
-                val stored = repo.latestMessage(threadIdOf(app, address)) ?: Message(
-                    id = 0,
-                    threadId = threadIdOf(app, address),
-                    address = address,
-                    body = body,
-                    date = timestamp,
-                    dateSent = timestamp,
-                    type = Message.TYPE_INBOX,
-                    read = false,
+                MessageNotifier(app).notifyIncoming(
+                    Message(
+                        id = stored.id,
+                        threadId = stored.threadId,
+                        address = address,
+                        body = body,
+                        date = timestamp,
+                        dateSent = timestamp,
+                        type = Message.TYPE_INBOX,
+                        read = false,
+                        subscriptionId = subId,
+                    )
                 )
-                MessageNotifier(app).notifyIncoming(stored.copy(body = body, address = address))
                 ServiceLocator.notifyDataChanged()
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed handling incoming SMS", t)
@@ -61,9 +64,6 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             }
         }
     }
-
-    private fun threadIdOf(context: Context, address: String): Long =
-        ServiceLocator.smsRepository(context).threadIdFor(setOf(address))
 
     private companion object {
         const val TAG = "SmsDeliverReceiver"

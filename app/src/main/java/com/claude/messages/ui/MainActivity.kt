@@ -1,10 +1,8 @@
 package com.claude.messages.ui
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,8 +29,23 @@ import com.claude.messages.ui.theme.MessagesTheme
 import com.claude.messages.ui.thread.ThreadScreen
 import com.claude.messages.ui.thread.ThreadViewModel
 import com.claude.messages.util.DefaultSmsHelper
+import kotlinx.coroutines.flow.MutableSharedFlow
+
+/** Where an incoming intent wants the app to open. */
+private sealed interface Destination {
+    data class Thread(val threadId: Long) : Destination
+    data class Compose(val address: String, val body: String) : Destination
+}
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * Deep links arriving after the activity is created. The activity is
+     * singleTask, so a notification tap while the app is already open reaches
+     * onNewIntent rather than re-running setContent — without this the tap
+     * would do nothing.
+     */
+    private val deepLinks = MutableSharedFlow<Destination>(extraBufferCapacity = 4)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -45,31 +58,35 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestRuntimePermissions()
+        requestMissingPermissions()
 
-        val initialThreadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
-        val sharedText = readSharedText(intent)
-        val sharedAddress = readAddress(intent)
+        val initial = destinationOf(intent)
 
         setContent {
             MessagesTheme {
                 val navController = rememberNavController()
 
+                fun go(destination: Destination) = when (destination) {
+                    is Destination.Thread ->
+                        navController.navigate("thread/${destination.threadId}")
+
+                    is Destination.Compose -> navController.navigate(
+                        "compose?address=${Uri.encode(destination.address)}" +
+                            "&body=${Uri.encode(destination.body)}"
+                    )
+                }
+
                 LaunchedEffect(Unit) {
-                    when {
-                        initialThreadId > 0 -> navController.navigate("thread/$initialThreadId")
-                        sharedAddress != null -> {
-                            val encoded = Uri.encode(sharedAddress)
-                            val body = Uri.encode(sharedText.orEmpty())
-                            navController.navigate("compose/$encoded?body=$body")
-                        }
-                    }
+                    initial?.let(::go)
+                    deepLinks.collect(::go)
                 }
 
                 NavHost(navController = navController, startDestination = "conversations") {
 
                     composable("conversations") {
                         val vm: ConversationsViewModel = viewModel()
+                        // Pick up a role or permission granted while we were away.
+                        LaunchedEffect(Unit) { vm.refresh() }
                         ConversationsScreen(
                             viewModel = vm,
                             onOpenThread = { navController.navigate("thread/$it") },
@@ -77,6 +94,8 @@ class MainActivity : ComponentActivity() {
                             onOpenRules = { navController.navigate("rules") },
                             onOpenSettings = { navController.navigate("settings") },
                             onRequestDefaultSms = ::requestDefaultSms,
+                            onGrantPermissions = ::requestMissingPermissions,
+                            onOpenAppSettings = ::openAppSettings,
                         )
                     }
 
@@ -86,14 +105,17 @@ class MainActivity : ComponentActivity() {
                     ) { entry ->
                         val threadId = entry.arguments?.getLong("threadId") ?: -1L
                         val vm: ThreadViewModel = viewModel()
-                        LaunchedEffect(threadId) { vm.load(threadId) }
+                        LaunchedEffect(threadId) { vm.open(threadId) }
                         ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
                     }
 
                     composable(
-                        route = "compose/{address}?body={body}",
+                        route = "compose?address={address}&body={body}",
                         arguments = listOf(
-                            navArgument("address") { type = NavType.StringType },
+                            navArgument("address") {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
                             navArgument("body") {
                                 type = NavType.StringType
                                 defaultValue = ""
@@ -103,7 +125,8 @@ class MainActivity : ComponentActivity() {
                         val address = entry.arguments?.getString("address").orEmpty()
                         val body = entry.arguments?.getString("body").orEmpty()
                         val vm: ThreadViewModel = viewModel()
-                        LaunchedEffect(address) { vm.loadForAddress(address, body) }
+                        // Passing the address is what lets a brand-new conversation send.
+                        LaunchedEffect(address) { vm.open(-1L, address, body) }
                         ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
                     }
 
@@ -112,9 +135,9 @@ class MainActivity : ComponentActivity() {
                         NewMessageScreen(
                             viewModel = vm,
                             onBack = { navController.popBackStack() },
-                            onOpenThread = { threadId ->
+                            onCompose = { address ->
                                 navController.popBackStack()
-                                navController.navigate("thread/$threadId")
+                                navController.navigate("compose?address=${Uri.encode(address)}&body=")
                             },
                         )
                     }
@@ -136,11 +159,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("ruleEditor") { entry ->
-                        // Share the RulesViewModel with the list so the editor
-                        // state set by startNew()/startEdit() survives navigation.
-                        val parent = remember(entry) {
-                            navController.getBackStackEntry("rules")
-                        }
+                        // Share the RulesViewModel with the list so the editor state
+                        // set by startNew()/startEdit() survives navigation.
+                        val parent = remember(entry) { navController.getBackStackEntry("rules") }
                         val vm: RulesViewModel = viewModel(parent)
                         RuleEditorScreen(
                             viewModel = vm,
@@ -163,40 +184,52 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        destinationOf(intent)?.let(deepLinks::tryEmit)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The default-SMS role may have changed in Settings while we were away.
+        ServiceLocator.notifyDataChanged()
     }
 
     private fun requestDefaultSms() {
         DefaultSmsHelper.requestIntent(this)?.let(defaultSmsLauncher::launch)
     }
 
-    private fun requestRuntimePermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.READ_SMS,
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.SEND_SMS,
-            Manifest.permission.READ_CONTACTS,
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions += Manifest.permission.POST_NOTIFICATIONS
-        }
-        permissionLauncher.launch(permissions.toTypedArray())
+    private fun openAppSettings() {
+        runCatching { startActivity(DefaultSmsHelper.appSettingsIntent(this)) }
     }
 
-    /** Text carried by an ACTION_SEND / sms: intent from another app. */
-    private fun readSharedText(intent: Intent): String? = when (intent.action) {
-        Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
-        Intent.ACTION_SENDTO, Intent.ACTION_VIEW ->
-            intent.getStringExtra("sms_body") ?: intent.getStringExtra(Intent.EXTRA_TEXT)
-
-        else -> null
+    private fun requestMissingPermissions() {
+        val missing = DefaultSmsHelper.missingPermissions(this)
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
     }
 
-    private fun readAddress(intent: Intent): String? {
-        val data = intent.data ?: return null
-        return when (data.scheme) {
-            "sms", "smsto", "mms", "mmsto" ->
-                data.schemeSpecificPart?.substringBefore('?')?.trim()?.takeIf { it.isNotEmpty() }
+    /** Reads where an intent wants us to go: a notification tap, or a share. */
+    private fun destinationOf(intent: Intent): Destination? {
+        val threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
+        if (threadId > 0) return Destination.Thread(threadId)
 
+        val address = intent.data
+            ?.takeIf { it.scheme in setOf("sms", "smsto", "mms", "mmsto") }
+            ?.schemeSpecificPart
+            ?.substringBefore('?')
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+        val body = when (intent.action) {
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            Intent.ACTION_SENDTO, Intent.ACTION_VIEW ->
+                intent.getStringExtra("sms_body") ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+
+            else -> null
+        }.orEmpty()
+
+        return when {
+            address != null -> Destination.Compose(address, body)
+            // A share with text but no recipient: let the user pick one.
+            body.isNotEmpty() -> Destination.Compose("", body)
             else -> null
         }
     }

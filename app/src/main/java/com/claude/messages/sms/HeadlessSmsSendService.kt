@@ -26,9 +26,7 @@ class HeadlessSmsSendService : Service() {
             val body = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
             if (recipients.isNotEmpty() && body.isNotEmpty()) {
                 val app = applicationContext
-                CoroutineScope(Dispatchers.IO).launch {
-                    SmsSender(app).send(recipients, body)
-                }
+                CoroutineScope(Dispatchers.IO).launch { SmsSender(app).send(recipients, body) }
             }
         }
         stopSelf(startId)

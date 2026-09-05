@@ -43,6 +43,9 @@ interface ThreadMetaDao {
     @Query("SELECT * FROM thread_meta")
     fun observeAll(): Flow<List<ThreadMeta>>
 
+    @Query("SELECT * FROM thread_meta")
+    suspend fun getAll(): List<ThreadMeta>
+
     @Query("SELECT * FROM thread_meta WHERE threadId = :threadId")
     suspend fun get(threadId: Long): ThreadMeta?
 

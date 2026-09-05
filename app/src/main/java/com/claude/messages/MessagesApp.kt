@@ -21,6 +21,12 @@ class MessagesApp : Application() {
         super.onCreate()
         ChannelManager(this).ensureBaseChannels()
         scope.launch { seedStarterRules() }
+
+        // Messages can also change from outside this process (another app, a
+        // restore); mirror those changes into the open screens.
+        ServiceLocator.smsRepository(this).observeChanges {
+            ServiceLocator.notifyDataChanged()
+        }
     }
 
     /**

@@ -18,6 +18,9 @@ object PhoneNumbers {
 
     /** True when two numbers refer to the same line, ignoring formatting. */
     fun sameNumber(a: String, b: String): Boolean {
+        // A blank address is "unknown", never a match — otherwise a rule with an
+        // empty number entry would fire on every message that lacks a sender.
+        if (a.isBlank() || b.isBlank()) return false
         if (a.equals(b, ignoreCase = true)) return true
         val na = normalize(a)
         val nb = normalize(b)

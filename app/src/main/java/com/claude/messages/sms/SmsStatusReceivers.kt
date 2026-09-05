@@ -14,27 +14,30 @@ import com.claude.messages.notifications.MessageNotifier
 class SmsSentReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val uri = intent.getStringExtra(SmsSender.EXTRA_MESSAGE_URI)?.let(Uri::parse) ?: return
-        val repo = ServiceLocator.smsRepository(context.applicationContext)
+        val isLastPart = intent.getBooleanExtra(SmsSender.EXTRA_IS_LAST_PART, true)
+        val app = context.applicationContext
+        val repo = ServiceLocator.smsRepository(app)
+
         if (resultCode == Activity.RESULT_OK) {
-            repo.updateMessageType(uri, Message.TYPE_SENT)
+            // Wait for the final part so a long message isn't marked sent early.
+            if (isLastPart) repo.updateMessageType(uri, Message.TYPE_SENT)
         } else {
             repo.updateMessageType(uri, Message.TYPE_FAILED)
             val recipient = intent.getStringExtra(SmsSender.EXTRA_RECIPIENT).orEmpty()
-            MessageNotifier(context.applicationContext)
-                .notifySendFailure(threadIdOf(context, recipient), recipient)
+            if (recipient.isNotBlank()) {
+                val threadId = repo.threadIdFor(setOf(recipient))
+                MessageNotifier(app).notifySendFailure(threadId, recipient)
+            }
         }
         ServiceLocator.notifyDataChanged()
     }
-
-    private fun threadIdOf(context: Context, address: String): Long =
-        if (address.isBlank()) -1L
-        else ServiceLocator.smsRepository(context.applicationContext).threadIdFor(setOf(address))
 }
 
 /** Records the carrier's delivery report so the thread can show "Delivered". */
 class SmsDeliveredReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val uri = intent.getStringExtra(SmsSender.EXTRA_MESSAGE_URI)?.let(Uri::parse) ?: return
+        if (!intent.getBooleanExtra(SmsSender.EXTRA_IS_LAST_PART, true)) return
         val status = if (resultCode == Activity.RESULT_OK) {
             Telephony.Sms.STATUS_COMPLETE
         } else {
@@ -45,7 +48,7 @@ class SmsDeliveredReceiver : BroadcastReceiver() {
     }
 }
 
-/** Re-creates notification channels after a reboot wipes nothing but is a good checkpoint. */
+/** Re-creates notification channels after a reboot. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         com.claude.messages.notifications.ChannelManager(context.applicationContext)

@@ -29,8 +29,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         val text = RemoteInput.getResultsFromIntent(intent)
                             ?.getCharSequence(KEY_REPLY_TEXT)?.toString().orEmpty().trim()
                         if (text.isNotEmpty()) {
-                            val recipients = repo.loadConversations()
-                                .firstOrNull { it.threadId == threadId }?.addresses.orEmpty()
+                            val recipients = repo.recipientsForThread(threadId)
                             if (recipients.isNotEmpty()) SmsSender(app).send(recipients, text)
                         }
                         repo.markThreadRead(threadId)

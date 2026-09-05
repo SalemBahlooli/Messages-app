@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Card
@@ -30,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -37,7 +40,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.claude.messages.data.db.NotificationRule
@@ -131,59 +137,77 @@ private fun RuleCard(
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val accent = rule.accentColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = if (rule.enabled) MaterialTheme.colorScheme.surfaceVariant
-            else MaterialTheme.colorScheme.surface,
+            containerColor = if (rule.enabled) MaterialTheme.colorScheme.surfaceContainerHigh
+            else MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // Tonal badge carries the rule's own accent colour and badge text.
+                Surface(
+                    shape = CircleShape,
+                    color = accent.copy(alpha = if (rule.enabled) 0.18f else 0.08f),
+                    modifier = Modifier.size(42.dp),
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         if (rule.titlePrefix.isNotBlank()) {
-                            Text(rule.titlePrefix)
-                            Spacer(Modifier.width(6.dp))
+                            Text(rule.titlePrefix.take(2))
+                        } else {
+                            Icon(
+                                Icons.Default.NotificationsActive,
+                                null,
+                                Modifier.size(20.dp),
+                                tint = accent,
+                            )
                         }
-                        Text(
-                            rule.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
                     }
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        rule.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Switch(checked = rule.enabled, onCheckedChange = onToggle)
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.MusicNote, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(rule.soundLabel, style = MaterialTheme.typography.labelMedium)
-
-                Spacer(Modifier.width(14.dp))
-                Icon(Icons.Default.Vibration, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(rule.vibration.label, style = MaterialTheme.typography.labelMedium)
-
-                Spacer(Modifier.weight(1f))
-                Text(
+                Attribute(Icons.Default.MusicNote, rule.soundLabel)
+                Spacer(Modifier.width(12.dp))
+                Attribute(Icons.Default.Vibration, rule.vibration.label)
+                Spacer(Modifier.width(12.dp))
+                Attribute(
+                    Icons.Default.PriorityHigh,
                     when (rule.importance) {
                         RuleImportance.SILENT -> "Silent"
                         RuleImportance.LOW -> "Quiet"
                         RuleImportance.NORMAL -> "Normal"
                         RuleImportance.HIGH -> "Urgent"
                     },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    highlight = rule.importance == RuleImportance.HIGH,
                 )
             }
 
@@ -204,5 +228,27 @@ private fun RuleCard(
                 }
             }
         }
+    }
+}
+
+/** One sound/vibration/urgency fact on a rule card. */
+@Composable
+private fun Attribute(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    highlight: Boolean = false,
+) {
+    val tint = if (highlight) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(15.dp), tint = tint)
+        Spacer(Modifier.width(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
