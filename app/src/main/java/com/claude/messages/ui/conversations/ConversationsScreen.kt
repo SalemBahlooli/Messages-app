@@ -68,6 +68,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.claude.messages.data.model.Conversation
 import com.claude.messages.ui.compose.Avatar
@@ -86,10 +88,16 @@ fun ConversationsScreen(
     onRequestDefaultSms: () -> Unit,
     onGrantPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onOpenDefaultAppsSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var menuOpen by remember { mutableStateOf(false) }
-    val setupNeeded = !state.hasSmsPermission || !state.isDefaultSmsApp
+    val setupIncomplete = !state.hasSmsPermission || !state.isDefaultSmsApp
+    val showSetupCard = setupIncomplete && !state.setupDismissed
+
+    // Re-check the role every time the screen comes forward: the user grants it
+    // in system Settings, so nothing in this process would otherwise notice.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -161,7 +169,7 @@ fun ConversationsScreen(
             }
         },
         floatingActionButton = {
-            if (!state.inSelectionMode && !state.showArchived && !setupNeeded) {
+            if (!state.inSelectionMode && !state.showArchived) {
                 ExtendedFloatingActionButton(
                     onClick = onNewMessage,
                     icon = { Icon(Icons.Default.Edit, null) },
@@ -175,7 +183,7 @@ fun ConversationsScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
 
             AnimatedVisibility(
-                visible = setupNeeded,
+                visible = showSetupCard,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically(),
             ) {
@@ -184,6 +192,8 @@ fun ConversationsScreen(
                     onGrantPermissions = onGrantPermissions,
                     onRequestDefaultSms = onRequestDefaultSms,
                     onOpenAppSettings = onOpenAppSettings,
+                    onOpenDefaultAppsSettings = onOpenDefaultAppsSettings,
+                    onDismiss = viewModel::dismissSetupBanner,
                 )
             }
 
@@ -202,7 +212,7 @@ fun ConversationsScreen(
             when {
                 state.searching -> SearchResults(state.searchResults, onOpenThread)
 
-                state.conversations.isEmpty() && !state.loading && !setupNeeded -> EmptyState(
+                state.conversations.isEmpty() && !state.loading -> EmptyState(
                     icon = Icons.AutoMirrored.Filled.Message,
                     title = if (state.showArchived) "Nothing archived" else "No conversations yet",
                     subtitle = if (state.showArchived) null

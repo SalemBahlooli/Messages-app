@@ -11,13 +11,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,8 +37,8 @@ import com.claude.messages.util.DefaultSmsHelper
 
 /**
  * Shown until the app is usable: it needs the SMS permissions and the default
- * SMS role. Includes help for the case where Android blocks the role because
- * the app was installed as an APK rather than from a store.
+ * SMS role. Compact and dismissible — if the user can't complete setup, an
+ * un-closable card on every launch is just noise; Settings keeps the status.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,49 +47,55 @@ fun SetupCard(
     onGrantPermissions: () -> Unit,
     onRequestDefaultSms: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    onOpenDefaultAppsSettings: () -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var helpOpen by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.primaryContainer,
     ) {
-        Column(Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Sms,
-                    null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = if (needsPermissions) "Almost ready" else "One last step",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                    Text(
+                        text = if (needsPermissions) "Grant access to your texts"
+                        else "Set Messages as your default SMS app",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = if (needsPermissions) {
+                            "Needed to show your conversations."
+                        } else {
+                            "Needed to send messages and save them."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        "Dismiss",
+                        Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = if (needsPermissions) {
-                    "Messages needs access to your texts and contacts to show your conversations."
-                } else {
-                    "Set Messages as your default SMS app to send and receive texts and to use notification rules."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(Modifier.height(16.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (!needsPermissions && DefaultSmsHelper.restrictedSettingsLikely) {
-                    TextButton(onClick = { helpOpen = true }) { Text("It was blocked") }
-                    Spacer(Modifier.width(8.dp))
+                if (!needsPermissions) {
+                    TextButton(onClick = { helpOpen = true }) { Text("Didn't work?") }
+                    Spacer(Modifier.width(4.dp))
                 }
                 Button(
                     onClick = if (needsPermissions) onGrantPermissions else onRequestDefaultSms
@@ -104,10 +112,8 @@ fun SetupCard(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
             RestrictedSettingsHelp(
-                onOpenAppSettings = {
-                    helpOpen = false
-                    onOpenAppSettings()
-                },
+                onOpenAppSettings = { helpOpen = false; onOpenAppSettings() },
+                onOpenDefaultAppsSettings = { helpOpen = false; onOpenDefaultAppsSettings() },
             )
         }
     }
@@ -118,13 +124,16 @@ fun SetupCard(
  * from becoming the default SMS handler until the user allows it by hand.
  */
 @Composable
-fun RestrictedSettingsHelp(onOpenAppSettings: () -> Unit) {
+fun RestrictedSettingsHelp(
+    onOpenAppSettings: () -> Unit,
+    onOpenDefaultAppsSettings: () -> Unit,
+) {
     Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Text(
-                "\"Denied access to be default SMS app\"",
+                "If setting the default was refused",
                 style = MaterialTheme.typography.titleMedium,
             )
         }
@@ -132,7 +141,7 @@ fun RestrictedSettingsHelp(onOpenAppSettings: () -> Unit) {
         Text(
             "Android blocks apps installed from an APK — rather than from a store — " +
                 "from taking sensitive roles like the SMS handler. It isn't a fault in " +
-                "this app, and you can allow it in two taps.",
+                "this app, and you can allow it by hand.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -141,7 +150,7 @@ fun RestrictedSettingsHelp(onOpenAppSettings: () -> Unit) {
             "Open this app's page in system Settings.",
             "Tap the ⋮ menu at the top right.",
             "Choose \"Allow restricted settings\".",
-            "Come back here and tap Set as default.",
+            "Come back and tap Set as default again.",
         ).forEachIndexed { index, step ->
             Row(Modifier.padding(bottom = 14.dp)) {
                 Surface(
@@ -165,10 +174,8 @@ fun RestrictedSettingsHelp(onOpenAppSettings: () -> Unit) {
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
         Text(
-            "The menu item only appears after the app has been denied once — which has " +
-                "already happened, so it should be there now.",
+            "The menu item only appears after the app has been refused once.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -178,5 +185,15 @@ fun RestrictedSettingsHelp(onOpenAppSettings: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text("Open app settings")
         }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onOpenDefaultAppsSettings, modifier = Modifier.fillMaxWidth()) {
+            Text("Open Android's default apps list")
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Settings → Apps → Default apps → SMS app also works on most phones.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
                             onRequestDefaultSms = ::requestDefaultSms,
                             onGrantPermissions = ::requestMissingPermissions,
                             onOpenAppSettings = ::openAppSettings,
+                            onOpenDefaultAppsSettings = ::openDefaultAppsSettings,
                         )
                     }
 
@@ -199,6 +200,10 @@ class MainActivity : ComponentActivity() {
 
     private fun openAppSettings() {
         runCatching { startActivity(DefaultSmsHelper.appSettingsIntent(this)) }
+    }
+
+    private fun openDefaultAppsSettings() {
+        runCatching { startActivity(DefaultSmsHelper.defaultAppsSettingsIntent()) }
     }
 
     private fun requestMissingPermissions() {

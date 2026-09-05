@@ -9,6 +9,7 @@ import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.ThreadMeta
 import com.claude.messages.data.model.Conversation
 import com.claude.messages.data.model.Message
+import com.claude.messages.data.prefs.UiPrefs
 import com.claude.messages.data.repo.ContactsRepository
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.notifications.IncomingMessage
@@ -41,6 +42,8 @@ data class ConversationsUiState(
     val selected: Set<Long> = emptySet(),
     /** Set when the inbox could not be read at all. */
     val loadError: String? = null,
+    /** The user closed the setup banner; Settings still reports the real state. */
+    val setupDismissed: Boolean = false,
 ) {
     val inSelectionMode: Boolean get() = selected.isNotEmpty()
     val selectedConversations: List<Conversation>
@@ -53,6 +56,7 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
     private val contacts = ServiceLocator.contactsRepository(app)
     private val db = ServiceLocator.database(app)
     private val notifier = MessageNotifier(app)
+    private val uiPrefs = UiPrefs(app)
 
     private val _state = MutableStateFlow(ConversationsUiState())
     val state: StateFlow<ConversationsUiState> = _state.asStateFlow()
@@ -71,8 +75,15 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             val app = getApplication<Application>()
             val isDefault = DefaultSmsHelper.isDefault(app)
             val hasPermission = DefaultSmsHelper.hasSmsPermissions(app)
+            // Completing setup should clear a previous dismissal, so the banner
+            // comes back if the role is ever revoked.
+            if (isDefault && hasPermission) uiPrefs.setupBannerDismissed = false
             _state.update {
-                it.copy(isDefaultSmsApp = isDefault, hasSmsPermission = hasPermission)
+                it.copy(
+                    isDefaultSmsApp = isDefault,
+                    hasSmsPermission = hasPermission,
+                    setupDismissed = uiPrefs.setupBannerDismissed,
+                )
             }
             if (!hasPermission) {
                 _state.update { it.copy(loading = false, conversations = emptyList()) }
@@ -161,6 +172,11 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             muted = meta?.muted == true,
             ruleLabel = ruleLabel,
         )
+    }
+
+    fun dismissSetupBanner() {
+        uiPrefs.setupBannerDismissed = true
+        _state.update { it.copy(setupDismissed = true) }
     }
 
     fun onSearchQueryChange(query: String) {

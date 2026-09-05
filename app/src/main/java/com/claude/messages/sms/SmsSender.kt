@@ -9,12 +9,14 @@ import android.telephony.SmsManager
 import android.util.Log
 import com.claude.messages.data.model.Message
 import com.claude.messages.di.ServiceLocator
+import com.claude.messages.util.DefaultSmsHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Outcome of a send attempt, so the UI can explain what went wrong. */
+/** Outcome of a send attempt, so the UI can explain exactly what happened. */
 sealed interface SendResult {
-    data class Success(val threadId: Long) : SendResult
+    /** The radio accepted the message. [warning] flags a non-fatal problem. */
+    data class Success(val threadId: Long, val warning: String? = null) : SendResult
     data class Failure(val reason: String) : SendResult
 }
 
@@ -30,28 +32,35 @@ class SmsSender(private val context: Context) {
         if (clean.isEmpty()) return@withContext SendResult.Failure("No recipient for this message")
         if (body.isEmpty()) return@withContext SendResult.Failure("Message is empty")
 
+        // Check what would stop the radio before touching anything.
+        DefaultSmsHelper.sendBlocker(context)?.let {
+            return@withContext SendResult.Failure(it.message)
+        }
+
         val repo = ServiceLocator.smsRepository(context)
         var lastThreadId = -1L
         var failure: String? = null
+        var couldNotStore = false
 
         for (recipient in clean) {
+            // Writing to the SMS provider requires being the default SMS app,
+            // but SEND_SMS alone is enough to transmit. So a failed write must
+            // never stop the send — it only means we can't keep our own copy.
             val stored = repo.insertOutgoing(recipient, body, subId)
-            if (stored == null) {
-                failure = "Couldn't save the message. Is Messages your default SMS app?"
-                continue
-            }
-            lastThreadId = stored.threadId
+            if (stored == null) couldNotStore = true
+            stored?.let { lastThreadId = it.threadId }
 
             val sent = runCatching {
                 val manager = smsManager(subId)
+                    ?: error("SMS service unavailable on this device")
                 val parts = manager.divideMessage(body)
-                val sentIntents = ArrayList<PendingIntent>(parts.size)
-                val deliveredIntents = ArrayList<PendingIntent>(parts.size)
+                val sentIntents = ArrayList<PendingIntent?>(parts.size)
+                val deliveredIntents = ArrayList<PendingIntent?>(parts.size)
                 parts.indices.forEach { i ->
                     // Only the last part reports the final state of the message.
                     val isLast = i == parts.size - 1
-                    sentIntents += sentIntent(stored.uri, recipient, i, isLast)
-                    deliveredIntents += deliveredIntent(stored.uri, i, isLast)
+                    sentIntents += stored?.let { sentIntent(it.uri, recipient, i, isLast) }
+                    deliveredIntents += stored?.let { deliveredIntent(it.uri, i, isLast) }
                 }
                 if (parts.size == 1) {
                     manager.sendTextMessage(
@@ -65,27 +74,50 @@ class SmsSender(private val context: Context) {
             }
 
             if (sent.isFailure) {
-                Log.e(TAG, "sendTextMessage failed", sent.exceptionOrNull())
-                repo.updateMessageType(stored.uri, Message.TYPE_FAILED)
-                failure = sent.exceptionOrNull()?.message
-                    ?: "The system rejected the message. Check the SMS permission."
+                val error = sent.exceptionOrNull()
+                Log.e(TAG, "Sending to $recipient failed", error)
+                stored?.let { repo.updateMessageType(it.uri, Message.TYPE_FAILED) }
+                failure = describe(error)
             }
         }
 
         ServiceLocator.notifyDataChanged()
-        failure?.let { SendResult.Failure(it) } ?: SendResult.Success(lastThreadId)
+        when {
+            failure != null -> SendResult.Failure(failure)
+            couldNotStore -> SendResult.Success(
+                lastThreadId,
+                warning = "Sent, but it wasn't saved to your conversations — " +
+                    "Messages isn't your default SMS app.",
+            )
+
+            else -> SendResult.Success(lastThreadId)
+        }
+    }
+
+    /** Turns a platform exception into something worth showing a person. */
+    private fun describe(error: Throwable?): String = when {
+        error is SecurityException ->
+            "Android blocked the send. Check that Messages has the SMS permission."
+
+        error?.message?.contains("permission", ignoreCase = true) == true ->
+            "Android blocked the send: ${error.message}"
+
+        error?.message.isNullOrBlank() -> "The system rejected the message."
+        else -> "Couldn't send: ${error?.message}"
     }
 
     @Suppress("DEPRECATION")
-    private fun smsManager(subId: Int): SmsManager = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            context.getSystemService(SmsManager::class.java).let {
-                if (subId >= 0) it.createForSubscriptionId(subId) else it
-            }
+    private fun smsManager(subId: Int): SmsManager? = runCatching {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                context.getSystemService(SmsManager::class.java)?.let {
+                    if (subId >= 0) it.createForSubscriptionId(subId) else it
+                }
 
-        subId >= 0 -> SmsManager.getSmsManagerForSubscriptionId(subId)
-        else -> SmsManager.getDefault()
-    }
+            subId >= 0 -> SmsManager.getSmsManagerForSubscriptionId(subId)
+            else -> SmsManager.getDefault()
+        }
+    }.getOrNull()
 
     private fun sentIntent(uri: Uri, recipient: String, part: Int, isLast: Boolean): PendingIntent =
         PendingIntent.getBroadcast(

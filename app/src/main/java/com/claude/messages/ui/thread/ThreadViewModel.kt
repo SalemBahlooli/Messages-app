@@ -165,6 +165,7 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
                             sending = false,
                             // Adopt the thread the provider created for a new chat.
                             threadId = if (it.threadId > 0) it.threadId else result.threadId,
+                            errorMessage = result.warning,
                         )
                     }
                 }
@@ -213,7 +214,8 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
                 is SendResult.Failure ->
                     _state.update { it.copy(errorMessage = result.reason) }
 
-                is SendResult.Success -> Unit
+                is SendResult.Success ->
+                    result.warning?.let { w -> _state.update { it.copy(errorMessage = w) } }
             }
             refresh()
         }
