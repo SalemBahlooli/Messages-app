@@ -268,16 +268,6 @@ class SmsRepository(private val context: Context) {
         updated > 0
     }
 
-    suspend fun hasUnread(threadId: Long): Boolean = withContext(Dispatchers.IO) {
-        resolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(Telephony.Sms._ID),
-            "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
-            arrayOf(threadId.toString()),
-            "LIMIT 1",
-        )?.use { it.count > 0 } ?: false
-    }
-
     suspend fun deleteThread(threadId: Long) = withContext(Dispatchers.IO) {
         runCatching {
             resolver.delete(

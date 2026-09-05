@@ -1,6 +1,7 @@
 package com.claude.messages.ui.thread
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.claude.messages.data.db.NotificationRule
@@ -50,6 +51,10 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
 
     private var initialized = false
 
+    private companion object {
+        const val TAG = "ThreadVM"
+    }
+
     /**
      * Opens a conversation.
      *
@@ -90,20 +95,28 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         viewModelScope.launch {
             val threadId = _state.value.threadId
-            val messages = if (threadId > 0) smsRepo.loadMessages(threadId) else emptyList()
+            // Provider reads go through OEM code; degrade rather than crash.
+            val messages = runCatching {
+                if (threadId > 0) smsRepo.loadMessages(threadId) else emptyList()
+            }.onFailure { Log.e(TAG, "Could not load thread $threadId", it) }
+                .getOrDefault(emptyList())
 
             // Prefer the thread's own recipient list so an empty conversation
             // still knows its recipients; fall back to whatever we were seeded with.
-            val fromThread = if (threadId > 0) smsRepo.recipientsForThread(threadId) else emptyList()
+            val fromThread = runCatching {
+                if (threadId > 0) smsRepo.recipientsForThread(threadId) else emptyList()
+            }.getOrDefault(emptyList())
             val recipients = fromThread.ifEmpty { _state.value.recipients }
 
-            val meta = if (threadId > 0) db.threadMetaDao().get(threadId) else null
+            val meta = runCatching {
+                if (threadId > 0) db.threadMetaDao().get(threadId) else null
+            }.getOrNull()
             val contact = recipients.firstOrNull()?.let { contacts.lookup(it) }
             val names = recipients.map { addr ->
                 contacts.lookup(addr)?.name?.takeIf { it.isNotBlank() }
                     ?: ContactsRepository.formatNumber(addr)
             }
-            val rules = db.ruleDao().getAll()
+            val rules = runCatching { db.ruleDao().getAll() }.getOrDefault(emptyList())
 
             _state.update {
                 it.copy(

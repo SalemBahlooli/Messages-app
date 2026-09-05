@@ -1,8 +1,10 @@
 package com.claude.messages.ui.conversations
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.ThreadMeta
 import com.claude.messages.data.model.Conversation
@@ -37,6 +39,8 @@ data class ConversationsUiState(
     val hasSmsPermission: Boolean = true,
     val archivedCount: Int = 0,
     val selected: Set<Long> = emptySet(),
+    /** Set when the inbox could not be read at all. */
+    val loadError: String? = null,
 ) {
     val inSelectionMode: Boolean get() = selected.isNotEmpty()
     val selectedConversations: List<Conversation>
@@ -56,7 +60,7 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
     init {
         refresh()
         viewModelScope.launch {
-            // collectLatest coalesces the burst of provider notifications that a
+            // collectLatest coalesces the burst of provider notifications a
             // single write produces into one reload.
             ServiceLocator.dataChanged.collectLatest { refresh() }
         }
@@ -75,58 +79,40 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
 
-            val raw = smsRepo.loadConversations()
-            // One query for all metadata instead of one per conversation.
-            val metas = db.threadMetaDao().getAll().associateBy { it.threadId }
-            val rules = db.ruleDao().getEnabled()
+            // Reading the SMS provider goes through OEM code with its own quirks.
+            // A failure here should show an empty inbox, never take down the app.
+            val raw = runCatching { smsRepo.loadConversations() }
+                .onFailure { Log.e(TAG, "Could not load conversations", it) }
+                .getOrNull()
 
-            val decorated = raw.map { conv ->
-                val meta = metas[conv.threadId]
-                val contact = contacts.lookup(conv.primaryAddress)
-                val memberNames = conv.addresses.map { addr ->
-                    contacts.lookup(addr)?.name?.takeIf { it.isNotBlank() }
-                        ?: ContactsRepository.formatNumber(addr)
+            if (raw == null) {
+                _state.update {
+                    it.copy(loading = false, loadError = "Couldn't read your messages")
                 }
-                val custom = meta?.customName
-                val name = when {
-                    !custom.isNullOrBlank() -> custom
-                    memberNames.isEmpty() -> "(no recipient)"
-                    else -> memberNames.joinToString(", ")
-                }
+                return@launch
+            }
 
-                // Only sender-based rules are meaningful for a whole conversation;
-                // a content rule describes one message, not the thread.
-                val ruleLabel = meta?.forcedRuleId
-                    ?.let { id -> rules.firstOrNull { it.id == id }?.name }
-                    ?: rules.filter { it.senderMatch != SenderMatch.ANY }
-                        .let { senderRules ->
-                            RuleEngine.match(
-                                senderRules,
-                                IncomingMessage(
-                                    address = conv.primaryAddress,
-                                    body = "",
-                                    senderIsKnownContact = contact != null,
-                                ),
-                            )?.rule?.name
-                        }
+            val metas = runCatching { db.threadMetaDao().getAll() }
+                .getOrDefault(emptyList()).associateBy { it.threadId }
+            val rules = runCatching { db.ruleDao().getEnabled() }.getOrDefault(emptyList())
 
-                conv.copy(
-                    displayName = name,
-                    photoUri = contact?.photoUri,
-                    pinned = meta?.pinned == true,
-                    archived = meta?.archived == true,
-                    muted = meta?.muted == true,
-                    ruleLabel = ruleLabel,
-                )
+            // One bad row shouldn't hide every other conversation.
+            val decorated = raw.mapNotNull { conv ->
+                runCatching { decorate(conv, metas[conv.threadId], rules) }
+                    .onFailure { Log.e(TAG, "Skipping thread ${conv.threadId}", it) }
+                    .getOrNull()
             }
 
             val visible = decorated
                 .filter { it.archived == _state.value.showArchived }
-                .sortedWith(compareByDescending<Conversation> { it.pinned }.thenByDescending { it.date })
+                .sortedWith(
+                    compareByDescending<Conversation> { it.pinned }.thenByDescending { it.date }
+                )
 
             _state.update {
                 it.copy(
                     loading = false,
+                    loadError = null,
                     conversations = visible,
                     archivedCount = decorated.count { c -> c.archived },
                     // Drop selections for conversations that no longer exist.
@@ -136,6 +122,47 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Resolves names, photos and per-thread state for one conversation row. */
+    private suspend fun decorate(
+        conv: Conversation,
+        meta: ThreadMeta?,
+        rules: List<NotificationRule>,
+    ): Conversation {
+        val contact = contacts.lookup(conv.primaryAddress)
+        val memberNames = conv.addresses.map { addr ->
+            contacts.lookup(addr)?.name?.takeIf { it.isNotBlank() }
+                ?: ContactsRepository.formatNumber(addr)
+        }
+        val custom = meta?.customName
+        val name = when {
+            !custom.isNullOrBlank() -> custom
+            memberNames.isEmpty() -> "(no recipient)"
+            else -> memberNames.joinToString(", ")
+        }
+
+        // Only sender-based rules are meaningful for a whole conversation;
+        // a content rule describes one message, not the thread.
+        val ruleLabel = meta?.forcedRuleId
+            ?.let { id -> rules.firstOrNull { it.id == id }?.name }
+            ?: RuleEngine.match(
+                rules.filter { it.senderMatch != SenderMatch.ANY },
+                IncomingMessage(
+                    address = conv.primaryAddress,
+                    body = "",
+                    senderIsKnownContact = contact != null,
+                ),
+            )?.rule?.name
+
+        return conv.copy(
+            displayName = name,
+            photoUri = contact?.photoUri,
+            pinned = meta?.pinned == true,
+            archived = meta?.archived == true,
+            muted = meta?.muted == true,
+            ruleLabel = ruleLabel,
+        )
+    }
+
     fun onSearchQueryChange(query: String) {
         _state.update { it.copy(searchQuery = query, searching = query.isNotBlank()) }
         if (query.isBlank()) {
@@ -143,14 +170,16 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            val hits = smsRepo.searchMessages(query).map { message ->
-                SearchHit(
-                    message = message,
-                    displayName = contacts.lookup(message.address)?.name
-                        ?.takeIf { it.isNotBlank() }
-                        ?: ContactsRepository.formatNumber(message.address),
-                )
-            }
+            val hits = runCatching {
+                smsRepo.searchMessages(query).map { message ->
+                    SearchHit(
+                        message = message,
+                        displayName = contacts.lookup(message.address)?.name
+                            ?.takeIf { it.isNotBlank() }
+                            ?: ContactsRepository.formatNumber(message.address),
+                    )
+                }
+            }.getOrDefault(emptyList())
             // Ignore results for a query the user has already moved on from.
             if (_state.value.searchQuery == query) {
                 _state.update { it.copy(searchResults = hits) }
@@ -231,5 +260,9 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             clearSelection()
             refresh()
         }
+    }
+
+    private companion object {
+        const val TAG = "ConversationsVM"
     }
 }
