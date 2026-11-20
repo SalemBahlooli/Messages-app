@@ -3,6 +3,7 @@ package com.claude.messages.util
 import android.content.Context
 import android.text.format.DateUtils
 import com.claude.messages.R
+import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -15,6 +16,9 @@ object Formatting {
     private val dateFormat = SimpleDateFormat("MMM d", Locale.getDefault())
     private val fullFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
     private val fullWithTime = SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.getDefault())
+    private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+    private val shortMonthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+    private val dayMonthFormat = SimpleDateFormat("d MMM", Locale.getDefault())
 
     /** Compact stamp for the conversation list: time today, weekday this week, else date. */
     fun listTimestamp(millis: Long): String {
@@ -32,6 +36,10 @@ object Formatting {
         }
     }
 
+    /** "4 Nov" — a date without the year, for rows inside one month. */
+    fun dayAndMonth(millis: Long): String =
+        if (millis <= 0) "" else dayMonthFormat.format(Date(millis))
+
     fun messageTimestamp(millis: Long): String =
         if (millis <= 0) "" else timeFormat.format(Date(millis))
 
@@ -48,6 +56,41 @@ object Formatting {
             context.getString(R.string.yesterday)
 
         else -> fullFormat.format(Date(millis))
+    }
+
+    /** Currencies whose minor unit is a thousandth rather than a hundredth. */
+    private val threeDecimalCurrencies = setOf("OMR", "KWD", "BHD", "JOD", "TND", "LYD")
+
+    /** "1,250.500 OMR" — the currency after the number, as bank SMS writes it. */
+    fun money(amount: Double, currency: String): String {
+        val digits = if (currency in threeDecimalCurrencies) 3 else 2
+        val format = DecimalFormat().apply {
+            minimumFractionDigits = digits
+            maximumFractionDigits = digits
+            isGroupingUsed = true
+        }
+        val number = format.format(amount)
+        return if (currency.isEmpty()) number else "$number $currency"
+    }
+
+    /** "November 2025", in the phone's language. */
+    fun monthLabel(year: Int, month: Int): String {
+        val c = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        return monthFormat.format(c.time)
+    }
+
+    /** "Nov" — for the month picker, where space is tight. */
+    fun shortMonthLabel(year: Int, month: Int): String {
+        val c = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        return shortMonthFormat.format(c.time)
     }
 
     fun sameDay(a: Long, b: Long): Boolean {

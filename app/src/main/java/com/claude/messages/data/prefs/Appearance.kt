@@ -31,6 +31,8 @@ enum class ThemeMode(@StringRes val labelRes: Int) {
 data class AppearanceSettings(
     val scale: UiScale = UiScale.COSY,
     val themeMode: ThemeMode = ThemeMode.BRAND,
+    /** An id from the font catalogue; "system" is Android's own typeface. */
+    val fontId: String = "system",
 )
 
 /**
@@ -51,12 +53,18 @@ object Appearance {
         _settings.value = AppearanceSettings(
             scale = store.getString(KEY_SCALE, null).toScale(),
             themeMode = store.getString(KEY_THEME, null).toThemeMode(),
+            fontId = store.getString(KEY_FONT, null) ?: "system",
         )
     }
 
     fun setScale(scale: UiScale) {
         prefs?.edit()?.putString(KEY_SCALE, scale.name)?.apply()
         _settings.value = _settings.value.copy(scale = scale)
+    }
+
+    fun setFont(id: String) {
+        prefs?.edit()?.putString(KEY_FONT, id)?.apply()
+        _settings.value = _settings.value.copy(fontId = id)
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -72,4 +80,5 @@ object Appearance {
 
     private const val KEY_SCALE = "ui_scale"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_FONT = "font_id"
 }

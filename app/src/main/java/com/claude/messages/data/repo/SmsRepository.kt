@@ -166,6 +166,25 @@ class SmsRepository(private val context: Context) {
             out.sortedBy { it.date }
         }
 
+    /**
+     * Every received message newer than [sinceMillis]. Used by the money screen,
+     * which has to look at the whole inbox rather than one conversation.
+     */
+    suspend fun loadInboxSince(sinceMillis: Long, limit: Int = 3000): List<Message> =
+        withContext(Dispatchers.IO) {
+            val out = mutableListOf<Message>()
+            runCatching {
+                resolver.query(
+                    Telephony.Sms.Inbox.CONTENT_URI,
+                    SMS_PROJECTION,
+                    "${Telephony.Sms.DATE} >= ?",
+                    arrayOf(sinceMillis.toString()),
+                    "${Telephony.Sms.DATE} DESC LIMIT $limit",
+                )?.use { c -> while (c.moveToNext()) out += c.toMessage() }
+            }
+            out
+        }
+
     suspend fun searchMessages(query: String, limit: Int = 100): List<Message> =
         withContext(Dispatchers.IO) {
             if (query.isBlank()) return@withContext emptyList()

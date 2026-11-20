@@ -3,8 +3,10 @@ package com.claude.messages.ui.home
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.foundation.layout.height
@@ -29,6 +31,12 @@ enum class HomeTab(
     val icon: ImageVector,
 ) {
     CHATS("chats", R.string.tab_chats, Icons.AutoMirrored.Filled.Chat, Icons.AutoMirrored.Outlined.Chat),
+    MONEY(
+        "money",
+        R.string.tab_money,
+        Icons.Filled.AccountBalanceWallet,
+        Icons.Outlined.AccountBalanceWallet,
+    ),
     RULES("rules", R.string.tab_rules, Icons.Filled.Tune, Icons.Outlined.Tune),
     SETTINGS("settings", R.string.tab_settings, Icons.Filled.Settings, Icons.Outlined.Settings),
     ;

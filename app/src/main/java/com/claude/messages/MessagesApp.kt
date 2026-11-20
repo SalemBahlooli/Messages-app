@@ -9,6 +9,7 @@ import com.claude.messages.data.db.VibrationPattern
 import com.claude.messages.data.prefs.Appearance
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.notifications.ChannelManager
+import com.claude.messages.ui.theme.AppFonts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +22,7 @@ class MessagesApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Appearance.init(this)
+        AppFonts.init(this)
         ChannelManager(this).ensureBaseChannels()
         scope.launch { seedStarterRules() }
 

@@ -244,4 +244,36 @@
     <string name="theme_colors_hint">Use the app\'s own palette, or follow your wallpaper.</string>
     <string name="theme_brand">App</string>
     <string name="theme_system">Wallpaper</string>
+    <!-- Fonts -->
+    <string name="edit">Edit</string>
+    <string name="font">Font</string>
+    <string name="font_hint">Pick a typeface, or install a .ttf / .otf from your phone.</string>
+    <string name="font_preview">The quick brown fox — 0123</string>
+    <string name="font_install">Install a font from this phone</string>
+    <string name="font_install_failed">That file couldn\'t be read as a font. It has to be a .ttf or .otf.</string>
+    <!-- Money -->
+    <string name="tab_money">Money</string>
+    <string name="money_subtitle">Read from your bank messages</string>
+    <string name="money_needs_permission">Messages can\'t read your inbox yet</string>
+    <string name="money_needs_permission_hint">Grant the SMS permission and your bank messages will be totalled here. Nothing leaves the phone.</string>
+    <string name="money_empty">No bank messages found</string>
+    <string name="money_empty_hint">Messages that name an amount and a currency are counted automatically — a deposit, a card purchase, a salary. Nothing to count yet.</string>
+    <string name="money_in">In</string>
+    <string name="money_out">Out</string>
+    <string name="money_net">Left over</string>
+    <string name="money_salary">Salary</string>
+    <string name="money_no_salary">No salary message this month</string>
+    <string name="money_create_salary_rule">Give salary its own alert</string>
+    <string name="money_salary_rule_name">Salary</string>
+    <string name="money_budget">Monthly budget</string>
+    <string name="money_budget_hint">A spending limit for the month. Leave it at zero to turn the budget off.</string>
+    <string name="money_no_budget">Not set</string>
+    <string name="money_set_budget">Set</string>
+    <string name="money_budget_left">%s left to spend</string>
+    <string name="money_over_budget">%s over budget</string>
+    <string name="money_daily_allowance">About %s a day for the rest of the month</string>
+    <string name="money_balances">Last known balance</string>
+    <string name="money_balance_caveat">From the most recent message each bank sent — it may be out of date.</string>
+    <string name="money_top_spend">Where it went</string>
+    <string name="money_transactions">Transactions</string>
 </resources>

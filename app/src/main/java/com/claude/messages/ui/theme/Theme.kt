@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -145,6 +146,25 @@ private val AppTypography = Typography(
     ),
 )
 
+/** Applies the chosen typeface to every text style in one go. */
+private fun Typography.withFamily(family: FontFamily): Typography = Typography(
+    displayLarge = displayLarge.copy(fontFamily = family),
+    displayMedium = displayMedium.copy(fontFamily = family),
+    displaySmall = displaySmall.copy(fontFamily = family),
+    headlineLarge = headlineLarge.copy(fontFamily = family),
+    headlineMedium = headlineMedium.copy(fontFamily = family),
+    headlineSmall = headlineSmall.copy(fontFamily = family),
+    titleLarge = titleLarge.copy(fontFamily = family),
+    titleMedium = titleMedium.copy(fontFamily = family),
+    titleSmall = titleSmall.copy(fontFamily = family),
+    bodyLarge = bodyLarge.copy(fontFamily = family),
+    bodyMedium = bodyMedium.copy(fontFamily = family),
+    bodySmall = bodySmall.copy(fontFamily = family),
+    labelLarge = labelLarge.copy(fontFamily = family),
+    labelMedium = labelMedium.copy(fontFamily = family),
+    labelSmall = labelSmall.copy(fontFamily = family),
+)
+
 /** Palette used to tint avatars, chosen deterministically from the contact name. */
 val AvatarColors = listOf(
     Color(0xFF4B49D6), Color(0xFFC2410C), Color(0xFF0D7A6E), Color(0xFF9333EA),
@@ -186,10 +206,18 @@ fun MessagesTheme(content: @Composable () -> Unit) {
         )
     }
 
+    val fonts by AppFonts.fonts.collectAsStateWithLifecycle()
+    val typography = remember(settings.fontId, fonts) {
+        when (val family = AppFonts.familyFor(settings.fontId)) {
+            FontFamily.Default -> AppTypography
+            else -> AppTypography.withFamily(family)
+        }
+    }
+
     CompositionLocalProvider(LocalDensity provides density) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = AppTypography,
+            typography = typography,
             shapes = AppShapes,
             content = content,
         )

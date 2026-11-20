@@ -37,6 +37,8 @@ import com.claude.messages.ui.conversations.ConversationsScreen
 import com.claude.messages.ui.conversations.ConversationsViewModel
 import com.claude.messages.ui.home.HomeNavigationBar
 import com.claude.messages.ui.home.HomeTab
+import com.claude.messages.ui.money.MoneyScreen
+import com.claude.messages.ui.money.MoneyViewModel
 import com.claude.messages.ui.newmessage.NewMessageScreen
 import com.claude.messages.ui.newmessage.NewMessageViewModel
 import com.claude.messages.ui.rules.RuleEditorScreen
@@ -165,6 +167,16 @@ class MainActivity : ComponentActivity() {
                         onGrantPermissions = onGrantPermissions,
                         onOpenAppSettings = onOpenAppSettings,
                         onOpenDefaultAppsSettings = onOpenDefaultAppsSettings,
+                    )
+                }
+
+                composable(HomeTab.MONEY.route) {
+                    val vm: MoneyViewModel = viewModel()
+                    MoneyScreen(
+                        viewModel = vm,
+                        contentPadding = tabPadding,
+                        onOpenThread = { navController.navigate("thread/$it") },
+                        onOpenRules = { navController.switchTab(HomeTab.RULES) },
                     )
                 }
 

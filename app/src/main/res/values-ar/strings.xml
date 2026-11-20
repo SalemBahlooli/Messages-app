@@ -248,4 +248,36 @@
     <string name="theme_colors_hint">ألوان التطبيق نفسه، أو ألوان خلفية جوالك.</string>
     <string name="theme_brand">التطبيق</string>
     <string name="theme_system">الخلفية</string>
+    <!-- Fonts -->
+    <string name="edit">تعديل</string>
+    <string name="font">الخط</string>
+    <string name="font_hint">اختر خطاً، أو ثبّت ملف ttf. / otf. من جوالك.</string>
+    <string name="font_preview">أبجد هوز حطي كلمن — ٠١٢٣</string>
+    <string name="font_install">تركيب خط من الجوال</string>
+    <string name="font_install_failed">ما قدرت أقرأ هذا الملف كخط. لازم يكون ttf. أو otf.</string>
+    <!-- Money -->
+    <string name="tab_money">المال</string>
+    <string name="money_subtitle">من رسائل البنك</string>
+    <string name="money_needs_permission">التطبيق ما يقدر يقرأ رسائلك بعد</string>
+    <string name="money_needs_permission_hint">امنح صلاحية الرسائل وراح تتجمع رسائل بنكك هنا. ولا شي يخرج من الجوال.</string>
+    <string name="money_empty">ما لقيت رسائل بنكية</string>
+    <string name="money_empty_hint">أي رسالة فيها مبلغ وعملة تُحسب تلقائياً — إيداع، شراء بالبطاقة، راتب. ما في شي للحساب حتى الآن.</string>
+    <string name="money_in">داخل</string>
+    <string name="money_out">خارج</string>
+    <string name="money_net">المتبقي</string>
+    <string name="money_salary">الراتب</string>
+    <string name="money_no_salary">ما في رسالة راتب هذا الشهر</string>
+    <string name="money_create_salary_rule">نغمة خاصة للراتب</string>
+    <string name="money_salary_rule_name">الراتب</string>
+    <string name="money_budget">ميزانية الشهر</string>
+    <string name="money_budget_hint">حد للمصروف الشهري. خلّه صفر لتعطيل الميزانية.</string>
+    <string name="money_no_budget">غير محددة</string>
+    <string name="money_set_budget">تحديد</string>
+    <string name="money_budget_left">باقي لك %s</string>
+    <string name="money_over_budget">تجاوزت الميزانية بـ %s</string>
+    <string name="money_daily_allowance">حوالي %s يومياً لبقية الشهر</string>
+    <string name="money_balances">آخر رصيد معروف</string>
+    <string name="money_balance_caveat">من آخر رسالة أرسلها كل بنك — قد يكون قديماً.</string>
+    <string name="money_top_spend">وين ذهبت</string>
+    <string name="money_transactions">العمليات</string>
 </resources>

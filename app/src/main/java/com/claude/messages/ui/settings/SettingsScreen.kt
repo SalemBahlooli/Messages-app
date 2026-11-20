@@ -12,19 +12,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,6 +57,7 @@ import com.claude.messages.data.prefs.UiScale
 import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.ui.compose.SectionHeader
 import com.claude.messages.ui.compose.SegmentedChoice
+import com.claude.messages.ui.theme.AppFonts
 import com.claude.messages.ui.compose.SettingRow
 import com.claude.messages.util.DefaultSmsHelper
 
@@ -209,6 +218,11 @@ private fun AppearanceControls() {
 
     Spacer(Modifier.height(10.dp))
 
+    Spacer(Modifier.height(10.dp))
+    FontPicker(selectedId = settings.fontId)
+
+    Spacer(Modifier.height(10.dp))
+
     SettingRow(
         title = stringResource(R.string.theme_colors),
         subtitle = stringResource(R.string.theme_colors_hint),
@@ -221,6 +235,105 @@ private fun AppearanceControls() {
         onSelect = Appearance::setThemeMode,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
     )
+}
+
+/**
+ * The font list. Android's own families are always there; a .ttf or .otf the
+ * user picks is copied into the app and joins them. Each row previews itself in
+ * its own typeface, which is the only honest way to choose one.
+ */
+@Composable
+private fun FontPicker(selectedId: String) {
+    val context = LocalContext.current
+    val fonts by AppFonts.fonts.collectAsState()
+    var failed by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val installed = AppFonts.install(context, uri)
+        if (installed != null) Appearance.setFont(installed.id) else failed = true
+    }
+
+    SettingRow(
+        title = stringResource(R.string.font),
+        subtitle = stringResource(R.string.font_hint),
+        leading = Icons.Default.TextFields,
+    )
+
+    fonts.forEach { font ->
+        val selected = font.id == selectedId
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 3.dp)
+                .clickable { Appearance.setFont(font.id) },
+        ) {
+            Row(
+                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        font.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.font_preview),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontFamily = font.family),
+                        maxLines = 1,
+                    )
+                }
+                if (font.installed) {
+                    IconButton(
+                        onClick = {
+                            if (selected) Appearance.setFont(AppFonts.SYSTEM_ID)
+                            AppFonts.remove(font.id)
+                        },
+                        modifier = Modifier.size(34.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            stringResource(R.string.delete),
+                            Modifier.size(16.dp),
+                        )
+                    }
+                }
+                if (selected) {
+                    Icon(Icons.Default.CheckCircle, null, Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+
+    OutlinedButton(
+        onClick = {
+            // Some file pickers only offer a font file under the wildcard type.
+            picker.launch(arrayOf("font/*", "application/x-font-ttf", "application/octet-stream", "*/*"))
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+    ) {
+        Icon(Icons.Default.FileUpload, null, Modifier.size(17.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.font_install))
+    }
+
+    if (failed) {
+        Text(
+            stringResource(R.string.font_install_failed),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+    }
 }
 
 @Composable
