@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,8 +91,12 @@ fun ThreadScreen(
     var ruleDialogOpen by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<Message?>(null) }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+    // The list is laid out bottom-up (reverseLayout), so it opens already at the
+    // newest message. Index 0 is the newest; only scroll when a new one arrives.
+    LaunchedEffect(state.messages.lastOrNull()?.id) {
+        if (state.messages.isNotEmpty() && listState.firstVisibleItemIndex > 0) {
+            listState.animateScrollToItem(0)
+        }
     }
 
     // Surface send failures instead of failing silently.
@@ -134,9 +138,16 @@ fun ThreadScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
+                reverseLayout = true,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                itemsIndexed(state.messages, key = { _, m -> m.id }) { index, message ->
+                val messages = state.messages
+                items(
+                    count = messages.size,
+                    key = { i -> messages[messages.lastIndex - i].id },
+                ) { i ->
+                    val index = messages.lastIndex - i
+                    val message = messages[index]
                     val previous = state.messages.getOrNull(index - 1)
                     val next = state.messages.getOrNull(index + 1)
                     val newDay = previous == null || !Formatting.sameDay(previous.date, message.date)
