@@ -236,4 +236,16 @@
     <string name="block_no_telephony">هذا الجهاز بلا شبكة خلوية، فلا يمكنه إرسال الرسائل.</string>
     <string name="block_no_sim">لا توجد شريحة اتصال. أدخل شريحة لإرسال الرسائل.</string>
     <string name="block_sim_locked">شريحتك مقفلة. افتح قفلها لإرسال الرسائل.</string>
+    <!-- Appearance -->
+    <string name="settings_appearance">المظهر</string>
+    <string name="display_size">حجم العرض</string>
+    <string name="display_size_hint">يصغّر هذا التطبيق وحده، بغض النظر عن حجم العرض في إعدادات أندرويد.</string>
+    <string name="scale_compact">مضغوط</string>
+    <string name="scale_cosy">مريح</string>
+    <string name="scale_standard">عادي</string>
+    <string name="scale_large">كبير</string>
+    <string name="theme_colors">الألوان</string>
+    <string name="theme_colors_hint">ألوان التطبيق نفسه، أو ألوان خلفية جوالك.</string>
+    <string name="theme_brand">التطبيق</string>
+    <string name="theme_system">الخلفية</string>
 </resources>

@@ -18,17 +18,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,11 +42,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.claude.messages.R
+import androidx.compose.runtime.collectAsState
+import com.claude.messages.data.prefs.Appearance
+import com.claude.messages.data.prefs.ThemeMode
+import com.claude.messages.data.prefs.UiScale
+import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.ui.compose.SectionHeader
+import com.claude.messages.ui.compose.SegmentedChoice
 import com.claude.messages.ui.compose.SettingRow
 import com.claude.messages.util.DefaultSmsHelper
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     contentPadding: PaddingValues,
@@ -70,19 +74,7 @@ fun SettingsScreen(
     Scaffold(
         modifier = Modifier.padding(contentPadding),
         containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.tab_settings),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
-        },
+        topBar = { AppHeader(title = stringResource(R.string.tab_settings)) },
     ) { padding ->
         Column(
             Modifier
@@ -91,6 +83,9 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 24.dp),
         ) {
+            SectionHeader(stringResource(R.string.settings_appearance))
+            AppearanceControls()
+
             SectionHeader(stringResource(R.string.settings_notifications))
             SettingRow(
                 title = stringResource(R.string.notification_rules),
@@ -188,6 +183,44 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/**
+ * Display size and palette. Both exist because the system-wide equivalents are
+ * all-or-nothing: a phone set to a large display size magnified every screen,
+ * and Material You painted this app in the same colours as the previous build.
+ */
+@Composable
+private fun AppearanceControls() {
+    val settings by Appearance.settings.collectAsState()
+
+    SettingRow(
+        title = stringResource(R.string.display_size),
+        subtitle = stringResource(R.string.display_size_hint),
+        leading = Icons.Default.FormatSize,
+    )
+    SegmentedChoice(
+        options = UiScale.entries,
+        selected = settings.scale,
+        label = { stringResource(it.labelRes) },
+        onSelect = Appearance::setScale,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+    )
+
+    Spacer(Modifier.height(10.dp))
+
+    SettingRow(
+        title = stringResource(R.string.theme_colors),
+        subtitle = stringResource(R.string.theme_colors_hint),
+        leading = Icons.Default.Palette,
+    )
+    SegmentedChoice(
+        options = ThemeMode.entries,
+        selected = settings.themeMode,
+        label = { stringResource(it.labelRes) },
+        onSelect = Appearance::setThemeMode,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+    )
 }
 
 @Composable

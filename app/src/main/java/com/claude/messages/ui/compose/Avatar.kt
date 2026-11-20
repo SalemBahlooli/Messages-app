@@ -36,7 +36,7 @@ fun Avatar(
     name: String,
     photoUri: String?,
     modifier: Modifier = Modifier,
-    size: Dp = 52.dp,
+    size: Dp = 44.dp,
     isGroup: Boolean = false,
     selected: Boolean = false,
 ) {
@@ -50,7 +50,8 @@ fun Avatar(
         label = "avatarBackground",
     )
     // Selected avatars square off slightly, echoing Material 3 shape morphing.
-    val shape = if (selected) RoundedCornerShape(16.dp) else CircleShape
+    val shape = if (selected) RoundedCornerShape(size / 3) else CircleShape
+    val glyph = size * 0.5f
 
     Box(
         modifier = modifier
@@ -63,6 +64,7 @@ fun Avatar(
             selected -> Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = "Selected",
+                modifier = Modifier.size(glyph),
                 tint = MaterialTheme.colorScheme.onPrimary,
             )
 
@@ -76,6 +78,7 @@ fun Avatar(
             isGroup -> Icon(
                 imageVector = Icons.Default.Group,
                 contentDescription = null,
+                modifier = Modifier.size(glyph),
                 tint = Color.White,
             )
 
@@ -83,7 +86,7 @@ fun Avatar(
                 text = Formatting.initials(name),
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = (size.value / 2.5f).sp,
+                fontSize = (size.value / 2.6f).sp,
             )
         }
     }

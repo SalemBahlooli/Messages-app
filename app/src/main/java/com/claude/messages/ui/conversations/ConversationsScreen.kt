@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,36 +36,27 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Unarchive
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -73,12 +68,13 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.claude.messages.R
 import com.claude.messages.data.model.Conversation
+import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.ui.compose.Avatar
 import com.claude.messages.ui.compose.EmptyState
+import com.claude.messages.ui.compose.HeaderAction
 import com.claude.messages.ui.compose.SetupCard
 import com.claude.messages.util.Formatting
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationsScreen(
     viewModel: ConversationsViewModel,
@@ -91,7 +87,6 @@ fun ConversationsScreen(
     onOpenDefaultAppsSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var menuOpen by remember { mutableStateOf(false) }
     val setupIncomplete = !state.hasSmsPermission || !state.isDefaultSmsApp
     val showSetupCard = setupIncomplete && !state.setupDismissed
 
@@ -102,9 +97,24 @@ fun ConversationsScreen(
     Scaffold(
         modifier = Modifier.padding(contentPadding),
         containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
+        floatingActionButton = {
+            if (!state.inSelectionMode && !state.showArchived) {
+                FloatingActionButton(
+                    onClick = onNewMessage,
+                    shape = MaterialTheme.shapes.medium,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(52.dp),
+                ) {
+                    Icon(Icons.Default.Edit, stringResource(R.string.start_chat), Modifier.size(20.dp))
+                }
+            }
+        },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+
             if (state.inSelectionMode) {
-                SelectionTopBar(
+                SelectionHeader(
                     count = state.selected.size,
                     showArchived = state.showArchived,
                     allPinned = state.selectedConversations.all { it.pinned },
@@ -117,67 +127,22 @@ fun ConversationsScreen(
                     onMute = viewModel::toggleMuteSelected,
                 )
             } else {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = stringResource(
-                                if (state.showArchived) R.string.archived else R.string.app_name
-                            ),
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
-                    },
-                    navigationIcon = {
-                        if (state.showArchived) {
-                            IconButton(onClick = viewModel::toggleArchivedView) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    stringResource(R.string.back),
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        if (!state.showArchived && state.archivedCount > 0) {
-                            Box {
-                                IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, stringResource(R.string.more))
-                                }
-                                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "${stringResource(R.string.archived)} (${state.archivedCount})"
-                                            )
-                                        },
-                                        leadingIcon = { Icon(Icons.Default.Archive, null) },
-                                        onClick = {
-                                            menuOpen = false
-                                            viewModel.toggleArchivedView()
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                AppHeader(
+                    title = stringResource(
+                        if (state.showArchived) R.string.archived else R.string.app_name
                     ),
-                )
+                    loading = state.loading,
+                    onBack = if (state.showArchived) viewModel::toggleArchivedView else null,
+                ) {
+                    if (!state.showArchived && state.archivedCount > 0) {
+                        HeaderAction(
+                            Icons.Default.Archive,
+                            stringResource(R.string.archived),
+                            viewModel::toggleArchivedView,
+                        )
+                    }
+                }
             }
-        },
-        floatingActionButton = {
-            if (!state.inSelectionMode && !state.showArchived) {
-                ExtendedFloatingActionButton(
-                    onClick = onNewMessage,
-                    icon = { Icon(Icons.Default.Edit, null) },
-                    text = { Text(stringResource(R.string.start_chat)) },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
 
             AnimatedVisibility(
                 visible = showSetupCard,
@@ -194,15 +159,13 @@ fun ConversationsScreen(
                 )
             }
 
-            if (!state.showArchived) {
+            if (!state.showArchived && !state.inSelectionMode) {
                 SearchField(
                     query = state.searchQuery,
                     onQueryChange = viewModel::onSearchQueryChange,
                     onClear = viewModel::closeSearch,
                 )
             }
-
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when {
                 state.searching -> SearchResults(state.searchResults, onOpenThread)
@@ -238,7 +201,7 @@ private fun ConversationList(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 96.dp, top = 4.dp),
+        contentPadding = PaddingValues(bottom = 88.dp, top = 2.dp),
     ) {
         if (pinned.isNotEmpty()) {
             item(key = "header_pinned") {
@@ -277,31 +240,30 @@ private fun ConversationList(
 }
 
 @Composable
-private fun ListHeader(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector?) {
+private fun ListHeader(text: String, icon: ImageVector?) {
     Row(
-        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 6.dp),
+        Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Icon(
                 icon,
                 null,
-                Modifier.size(14.dp),
+                Modifier.size(12.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(6.dp))
         }
         Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
+            text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SelectionTopBar(
+private fun SelectionHeader(
     count: Int,
     showArchived: Boolean,
     allPinned: Boolean,
@@ -313,52 +275,49 @@ private fun SelectionTopBar(
     onPin: () -> Unit,
     onMute: () -> Unit,
 ) {
-    TopAppBar(
-        title = {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.statusBarsPadding().padding(horizontal = 4.dp).heightIn(min = 52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, stringResource(R.string.cancel), Modifier.size(20.dp))
+            }
             Text(
                 pluralStringResource(R.plurals.selected_count, count, count),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
             )
-        },
-        navigationIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, stringResource(R.string.cancel))
-            }
-        },
-        actions = {
-            IconButton(onClick = onPin) {
-                Icon(
-                    Icons.Default.PushPin,
-                    stringResource(if (allPinned) R.string.unpin else R.string.pin),
-                )
-            }
-            IconButton(onClick = onMute) {
-                Icon(
-                    if (allMuted) Icons.Default.NotificationsActive
-                    else Icons.Default.NotificationsOff,
-                    stringResource(if (allMuted) R.string.unmute else R.string.mute),
-                )
-            }
-            IconButton(onClick = onMarkRead) {
-                Icon(Icons.Default.DoneAll, stringResource(R.string.mark_read))
-            }
-            IconButton(onClick = onArchive) {
-                Icon(
-                    if (showArchived) Icons.Default.Unarchive else Icons.Default.Archive,
-                    stringResource(if (showArchived) R.string.unarchive else R.string.archive),
-                )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, stringResource(R.string.delete))
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-    )
+            HeaderAction(
+                Icons.Default.PushPin,
+                stringResource(if (allPinned) R.string.unpin else R.string.pin),
+                onPin,
+            )
+            HeaderAction(
+                if (allMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                stringResource(if (allMuted) R.string.unmute else R.string.mute),
+                onMute,
+            )
+            HeaderAction(Icons.Default.DoneAll, stringResource(R.string.mark_read), onMarkRead)
+            HeaderAction(
+                if (showArchived) Icons.Default.Unarchive else Icons.Default.Archive,
+                stringResource(if (showArchived) R.string.unarchive else R.string.archive),
+                onArchive,
+            )
+            HeaderAction(Icons.Default.Delete, stringResource(R.string.delete), onDelete)
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * A pill search box built on BasicTextField: Material's TextField carries a
+ * 56dp minimum height and its own label padding, which is most of the bulk the
+ * list was losing to chrome.
+ */
 @Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit) {
     Surface(
@@ -366,29 +325,43 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.search_messages)) },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = onClear) {
-                        Icon(Icons.Default.Close, stringResource(R.string.clear))
-                    }
+        Row(
+            Modifier.heightIn(min = 40.dp).padding(start = 14.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.Search,
+                null,
+                Modifier.size(17.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    Text(
+                        stringResource(R.string.search_messages),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
-        )
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.merge(
+                        MaterialTheme.typography.bodyMedium
+                    ).copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, stringResource(R.string.clear), Modifier.size(16.dp))
+                }
+            }
+        }
     }
 }
 
@@ -401,17 +374,17 @@ private fun SearchResults(results: List<SearchHit>, onOpenThread: (Long) -> Unit
         )
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 4.dp)) {
         items(results, key = { it.message.id }) { hit ->
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clickable { onOpenThread(hit.message.threadId) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 18.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Avatar(name = hit.displayName, photoUri = null, size = 44.dp)
-                Spacer(Modifier.width(14.dp))
+                Avatar(name = hit.displayName, photoUri = null, size = 38.dp)
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -451,25 +424,26 @@ private fun ConversationRow(
 ) {
     Surface(
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 1.dp)
-            .clip(MaterialTheme.shapes.large)
+            .clip(RoundedCornerShape(20.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Avatar(
                 name = conversation.displayName,
                 photoUri = conversation.photoUri,
+                size = 44.dp,
                 isGroup = conversation.isGroup,
                 selected = selected,
             )
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -483,11 +457,11 @@ private fun ConversationRow(
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (conversation.muted) {
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(5.dp))
                         Icon(
                             Icons.Default.NotificationsOff,
                             stringResource(R.string.muted),
-                            Modifier.size(13.dp),
+                            Modifier.size(12.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -497,12 +471,10 @@ private fun ConversationRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = if (conversation.hasUnread) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (conversation.hasUnread) FontWeight.Bold
-                        else FontWeight.Normal,
                     )
                 }
 
-                Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(2.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -512,16 +484,17 @@ private fun ConversationRow(
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (conversation.hasUnread) FontWeight.Medium
                         else FontWeight.Normal,
-                        maxLines = 2,
+                        // One line keeps every row the same height, which is
+                        // what makes a long list scannable.
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    // A dot reads more calmly than a numeric badge in a dense list.
                     if (conversation.hasUnread) {
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(8.dp))
                         Box(
                             Modifier
-                                .size(9.dp)
+                                .size(8.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
                         )
@@ -529,22 +502,25 @@ private fun ConversationRow(
                 }
 
                 conversation.ruleLabel?.let { label ->
-                    Spacer(Modifier.height(5.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.NotificationsActive,
-                            null,
-                            Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, null, Modifier.size(11.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }

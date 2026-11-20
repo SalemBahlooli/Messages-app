@@ -232,4 +232,16 @@
     <string name="block_no_telephony">This device has no cellular radio, so it can\'t send SMS.</string>
     <string name="block_no_sim">No SIM card detected. Insert a SIM to send messages.</string>
     <string name="block_sim_locked">Your SIM is locked. Unlock it to send messages.</string>
+    <!-- Appearance -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="display_size">Display size</string>
+    <string name="display_size_hint">Scales this app only, independently of Android\'s display size.</string>
+    <string name="scale_compact">Compact</string>
+    <string name="scale_cosy">Cosy</string>
+    <string name="scale_standard">Standard</string>
+    <string name="scale_large">Large</string>
+    <string name="theme_colors">Colours</string>
+    <string name="theme_colors_hint">Use the app\'s own palette, or follow your wallpaper.</string>
+    <string name="theme_brand">App</string>
+    <string name="theme_system">Wallpaper</string>
 </resources>

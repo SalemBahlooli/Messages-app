@@ -1,12 +1,11 @@
 package com.claude.messages.ui.thread
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,10 +13,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -40,14 +42,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -56,10 +55,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,22 +63,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.data.model.Message
+import com.claude.messages.data.repo.ContactsRepository
 import com.claude.messages.ui.compose.Avatar
 import com.claude.messages.ui.theme.BubbleTextStyle
+import com.claude.messages.ui.theme.chatCanvas
 import com.claude.messages.util.Formatting
 import com.claude.messages.util.SmsLength
 
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ThreadScreen(
     viewModel: ThreadViewModel,
@@ -92,7 +88,6 @@ fun ThreadScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var menuOpen by remember { mutableStateOf(false) }
     var ruleDialogOpen by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<Message?>(null) }
 
@@ -111,83 +106,15 @@ fun ThreadScreen(
     val leave = { viewModel.saveDraft(); onBack() }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.chatCanvas,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(
-                            name = state.title,
-                            photoUri = state.photoUri,
-                            size = 38.dp,
-                            isGroup = state.isGroup,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                state.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                            )
-                            val subtitle = when {
-                                state.muted -> stringResource(R.string.muted)
-                                state.forcedRuleId != null -> state.availableRules
-                                    .firstOrNull { it.id == state.forcedRuleId }
-                                    ?.let { "${stringResource(R.string.rule_for_chat)}: ${it.name}" }
-
-                                else -> null
-                            }
-                            subtitle?.let {
-                                Text(
-                                    it,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = leave) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { ruleDialogOpen = true }) {
-                        Icon(Icons.Default.Tune, stringResource(R.string.rule_for_chat))
-                    }
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, stringResource(R.string.more))
-                    }
-                    DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(if (state.muted) R.string.unmute else R.string.mute_notifications)) },
-                            leadingIcon = {
-                                Icon(
-                                    if (state.muted) Icons.Default.NotificationsActive
-                                    else Icons.Default.NotificationsOff,
-                                    null,
-                                )
-                            },
-                            onClick = { menuOpen = false; viewModel.toggleMute() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.rule_for_chat)) },
-                            leadingIcon = { Icon(Icons.Default.Tune, null) },
-                            onClick = { menuOpen = false; ruleDialogOpen = true },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete_conversation)) },
-                            leadingIcon = { Icon(Icons.Default.Delete, null) },
-                            onClick = { menuOpen = false; viewModel.deleteThread(onBack) },
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+            ThreadHeader(
+                state = state,
+                onBack = leave,
+                onPickRule = { ruleDialogOpen = true },
+                onToggleMute = viewModel::toggleMute,
+                onDelete = { viewModel.deleteThread(onBack) },
             )
         },
         bottomBar = {
@@ -199,31 +126,42 @@ fun ThreadScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            itemsIndexed(state.messages, key = { _, m -> m.id }) { index, message ->
-                val previous = state.messages.getOrNull(index - 1)
-                val next = state.messages.getOrNull(index + 1)
-                val newDay = previous == null || !Formatting.sameDay(previous.date, message.date)
+        // Bubbles take a share of the width rather than a fixed 300dp, so they
+        // stay proportionate on a small screen and on a tablet alike.
+        BoxWithConstraints(Modifier.padding(padding).fillMaxSize()) {
+            val maxBubbleWidth = maxWidth * 0.78f
 
-                if (newDay) DaySeparator(message.date)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                itemsIndexed(state.messages, key = { _, m -> m.id }) { index, message ->
+                    val previous = state.messages.getOrNull(index - 1)
+                    val next = state.messages.getOrNull(index + 1)
+                    val newDay = previous == null || !Formatting.sameDay(previous.date, message.date)
 
-                // Consecutive messages from the same side are visually grouped.
-                val firstOfGroup = newDay || previous?.isOutgoing != message.isOutgoing
-                val lastOfGroup = next == null ||
-                    next.isOutgoing != message.isOutgoing ||
-                    !Formatting.sameDay(next.date, message.date)
+                    if (newDay) DaySeparator(message.date)
 
-                MessageBubble(
-                    message = message,
-                    firstOfGroup = firstOfGroup,
-                    lastOfGroup = lastOfGroup,
-                    onLongClick = { actionsFor = message },
-                    onRetry = { viewModel.resend(message) },
-                )
+                    // Consecutive messages from the same side are visually grouped.
+                    val firstOfGroup = newDay ||
+                        previous?.isOutgoing != message.isOutgoing ||
+                        previous.address != message.address
+                    val lastOfGroup = next == null ||
+                        next.isOutgoing != message.isOutgoing ||
+                        next.address != message.address ||
+                        !Formatting.sameDay(next.date, message.date)
+
+                    MessageBubble(
+                        message = message,
+                        maxWidth = maxBubbleWidth,
+                        firstOfGroup = firstOfGroup,
+                        lastOfGroup = lastOfGroup,
+                        showSender = state.isGroup && firstOfGroup && message.isIncoming,
+                        onLongClick = { actionsFor = message },
+                        onRetry = { viewModel.resend(message) },
+                    )
+                }
             }
         }
     }
@@ -253,21 +191,122 @@ fun ThreadScreen(
     }
 }
 
+/** Compact conversation header: avatar, name, state, actions — on one 52dp row. */
+@Composable
+private fun ThreadHeader(
+    state: ThreadUiState,
+    onBack: () -> Unit,
+    onPickRule: () -> Unit,
+    onToggleMute: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 2.dp, end = 4.dp)
+                .heightIn(min = 54.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    stringResource(R.string.back),
+                    Modifier.size(20.dp),
+                )
+            }
+            Avatar(
+                name = state.title,
+                photoUri = state.photoUri,
+                size = 34.dp,
+                isGroup = state.isGroup,
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    state.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitle = when {
+                    state.muted -> stringResource(R.string.muted)
+                    state.forcedRuleId != null -> state.availableRules
+                        .firstOrNull { it.id == state.forcedRuleId }
+                        ?.let { "${stringResource(R.string.rule_for_chat)}: ${it.name}" }
+
+                    else -> null
+                }
+                subtitle?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = onPickRule, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Tune, stringResource(R.string.rule_for_chat), Modifier.size(19.dp))
+            }
+            Box {
+                IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.MoreVert, stringResource(R.string.more), Modifier.size(19.dp))
+                }
+                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (state.muted) R.string.unmute
+                                    else R.string.mute_notifications
+                                )
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (state.muted) Icons.Default.NotificationsActive
+                                else Icons.Default.NotificationsOff,
+                                null,
+                            )
+                        },
+                        onClick = { menuOpen = false; onToggleMute() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.rule_for_chat)) },
+                        leadingIcon = { Icon(Icons.Default.Tune, null) },
+                        onClick = { menuOpen = false; onPickRule() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete_conversation)) },
+                        leadingIcon = { Icon(Icons.Default.Delete, null) },
+                        onClick = { menuOpen = false; onDelete() },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun DaySeparator(millis: Long) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.Center,
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             Text(
                 text = Formatting.daySeparator(LocalContext.current, millis),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
     }
@@ -277,117 +316,122 @@ private fun DaySeparator(millis: Long) {
 @Composable
 private fun MessageBubble(
     message: Message,
+    maxWidth: androidx.compose.ui.unit.Dp,
     firstOfGroup: Boolean,
     lastOfGroup: Boolean,
+    showSender: Boolean,
     onLongClick: () -> Unit,
     onRetry: () -> Unit,
 ) {
     val outgoing = message.isOutgoing
-    var showDetail by remember { mutableStateOf(false) }
 
-    val big = 20.dp
-    val small = 6.dp
+    // Round everywhere, with one tucked corner pointing at the sender's side on
+    // the last bubble of a run. Nothing in the thread has a square corner.
+    val round = 20.dp
+    val tucked = 7.dp
     val shape = RoundedCornerShape(
-        topStart = if (outgoing || firstOfGroup) big else small,
-        topEnd = if (!outgoing || firstOfGroup) big else small,
-        bottomStart = if (outgoing || lastOfGroup) big else small,
-        bottomEnd = if (!outgoing || lastOfGroup) big else small,
+        topStart = if (!outgoing && !firstOfGroup) tucked else round,
+        topEnd = if (outgoing && !firstOfGroup) tucked else round,
+        bottomStart = if (!outgoing && lastOfGroup) tucked else round,
+        bottomEnd = if (outgoing && lastOfGroup) tucked else round,
     )
+
+    val container = when {
+        message.isFailed -> MaterialTheme.colorScheme.errorContainer
+        outgoing -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val onContainer = when {
+        message.isFailed -> MaterialTheme.colorScheme.onErrorContainer
+        outgoing -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val background by animateColorAsState(container, label = "bubbleColor")
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = if (firstOfGroup) 6.dp else 2.dp),
+            .padding(top = if (firstOfGroup) 8.dp else 2.dp),
         horizontalAlignment = if (outgoing) Alignment.End else Alignment.Start,
     ) {
-        Surface(
-            color = when {
-                message.isFailed -> MaterialTheme.colorScheme.errorContainer
-                outgoing -> MaterialTheme.colorScheme.primary
-                else -> MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            contentColor = when {
-                message.isFailed -> MaterialTheme.colorScheme.onErrorContainer
-                outgoing -> MaterialTheme.colorScheme.onPrimary
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-            shape = shape,
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .combinedClickable(
-                    onClick = { showDetail = !showDetail },
-                    onLongClick = onLongClick,
-                ),
-        ) {
+        if (showSender) {
             Text(
-                text = message.body,
-                modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
-                style = BubbleTextStyle,
+                text = ContactsRepository.formatNumber(message.address),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 14.dp, bottom = 3.dp),
             )
         }
 
-        if (showDetail || message.isFailed || (lastOfGroup && outgoing)) {
+        Surface(
+            color = background,
+            contentColor = onContainer,
+            shape = shape,
+            modifier = Modifier
+                .widthIn(max = maxWidth)
+                .combinedClickable(onClick = {}, onLongClick = onLongClick),
+        ) {
+            Column(Modifier.padding(start = 13.dp, end = 13.dp, top = 8.dp, bottom = 6.dp)) {
+                Text(
+                    text = message.body,
+                    style = BubbleTextStyle,
+                )
+                // The timestamp lives inside the bubble, on every message: a
+                // thread you have to tap to date is not a readable thread.
+                Row(
+                    modifier = Modifier.align(Alignment.End).padding(top = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = Formatting.messageTimestamp(message.date),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = onContainer.copy(alpha = 0.7f),
+                    )
+                    if (outgoing) {
+                        Spacer(Modifier.width(4.dp))
+                        val (icon, label) = when {
+                            message.isFailed ->
+                                Icons.Default.ErrorOutline to stringResource(R.string.not_sent)
+
+                            message.isSending ->
+                                Icons.Default.Schedule to stringResource(R.string.sending)
+
+                            message.status == Message.STATUS_COMPLETE ->
+                                Icons.Default.DoneAll to stringResource(R.string.delivered)
+
+                            else -> Icons.Default.Check to stringResource(R.string.sent)
+                        }
+                        Icon(
+                            icon,
+                            label,
+                            Modifier.size(13.dp),
+                            tint = onContainer.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (message.isFailed) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                modifier = Modifier.padding(horizontal = 4.dp),
             ) {
-                if (showDetail || message.isFailed) {
-                    Text(
-                        text = Formatting.fullTimestamp(message.date),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                }
-                when {
-                    message.isFailed -> {
-                        Icon(
-                            Icons.Default.ErrorOutline,
-                            stringResource(R.string.not_sent),
-                            Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            stringResource(R.string.not_sent),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(onClick = onRetry, modifier = Modifier.height(30.dp)) {
-                            Icon(Icons.Default.Refresh, null, Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.retry), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-
-                    message.isSending -> StatusLabel(Icons.Default.Schedule, stringResource(R.string.sending))
-
-                    outgoing && message.status == Message.STATUS_COMPLETE ->
-                        StatusLabel(Icons.Default.DoneAll, stringResource(R.string.delivered), highlight = true)
-
-                    outgoing -> StatusLabel(Icons.Default.Check, stringResource(R.string.sent))
+                Text(
+                    stringResource(R.string.not_sent),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                TextButton(onClick = onRetry, modifier = Modifier.height(30.dp)) {
+                    Icon(Icons.Default.Refresh, null, Modifier.size(13.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.retry), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
     }
 }
 
-@Composable
-private fun StatusLabel(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    highlight: Boolean = false,
-) {
-    val tint = if (highlight) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, label, Modifier.size(13.dp), tint = tint)
-        Spacer(Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Composer(
     draft: String,
@@ -395,36 +439,40 @@ private fun Composer(
     onDraftChange: (String) -> Unit,
     onSend: () -> Unit,
 ) {
-    val sendScale by animateFloatAsState(if (canSend) 1f else 0.85f, label = "sendScale")
-
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             Surface(
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
-                Column {
-                    TextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(stringResource(R.string.text_message)) },
-                        maxLines = 6,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
-                    )
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                    Box {
+                        if (draft.isEmpty()) {
+                            Text(
+                                stringResource(R.string.text_message),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        BasicTextField(
+                            value = draft,
+                            onValueChange = onDraftChange,
+                            maxLines = 6,
+                            textStyle = LocalTextStyle.current.merge(
+                                MaterialTheme.typography.bodyLarge
+                            ).copy(color = MaterialTheme.colorScheme.onSurface),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     // Only worth showing once a message will actually be split.
                     val info = SmsLength.describe(LocalContext.current, draft)
                     if (info != null) {
@@ -432,7 +480,7 @@ private fun Composer(
                             text = info,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(top = 3.dp),
                         )
                     }
                 }
@@ -440,16 +488,28 @@ private fun Composer(
 
             Spacer(Modifier.width(8.dp))
 
-            FilledIconButton(
-                onClick = onSend,
-                enabled = canSend,
-                modifier = Modifier.size(52.dp).scale(sendScale),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+            val sendBackground by animateColorAsState(
+                if (canSend) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                label = "sendBackground",
+            )
+            Surface(
+                shape = CircleShape,
+                color = sendBackground,
+                contentColor = if (canSend) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(44.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.send))
+                Box(
+                    Modifier.clickable(enabled = canSend, onClick = onSend),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        stringResource(R.string.send),
+                        Modifier.size(19.dp),
+                    )
+                }
             }
         }
     }
@@ -482,14 +542,14 @@ private fun MessageActionsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, null, Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, null, Modifier.size(17.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onCopy) {
-                Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
+                Icon(Icons.Default.ContentCopy, null, Modifier.size(17.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.copy))
             }
@@ -554,7 +614,7 @@ private fun RuleOption(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Spacer(Modifier.width(4.dp))

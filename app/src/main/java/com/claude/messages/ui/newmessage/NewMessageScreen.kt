@@ -22,7 +22,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -36,6 +35,7 @@ import androidx.lifecycle.viewModelScope
 import com.claude.messages.data.model.Contact
 import com.claude.messages.data.repo.ContactsRepository
 import com.claude.messages.di.ServiceLocator
+import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.ui.compose.Avatar
 import com.claude.messages.ui.compose.EmptyState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,14 +95,7 @@ fun NewMessageScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.new_message)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                    }
-                },
-            )
+            AppHeader(title = stringResource(R.string.new_message), onBack = onBack)
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {

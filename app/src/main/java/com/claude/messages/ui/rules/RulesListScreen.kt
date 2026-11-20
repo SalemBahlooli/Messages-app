@@ -35,8 +35,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.notifications.RuleTextFormatter
+import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.ui.compose.EmptyState
 
 /**
@@ -75,32 +74,18 @@ fun RulesListScreen(
         modifier = Modifier.padding(contentPadding),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            stringResource(R.string.notification_rules),
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
-                        Text(
-                            stringResource(R.string.rules_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+            AppHeader(
+                title = stringResource(R.string.notification_rules),
+                subtitle = stringResource(R.string.rules_subtitle),
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onAddRule,
-                icon = { Icon(Icons.Default.Add, null) },
+                icon = { Icon(Icons.Default.Add, null, Modifier.size(19.dp)) },
                 text = { Text(stringResource(R.string.new_rule)) },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
     ) { padding ->

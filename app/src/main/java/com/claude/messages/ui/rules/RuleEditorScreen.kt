@@ -48,8 +48,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +68,7 @@ import com.claude.messages.data.db.ContentMatch
 import com.claude.messages.data.db.RuleImportance
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.VibrationPattern
+import com.claude.messages.ui.compose.AppHeader
 import com.claude.messages.notifications.RuleTextFormatter
 import com.claude.messages.ui.theme.AvatarColors
 
@@ -111,27 +110,17 @@ fun RuleEditorScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(if (state.isNew) R.string.new_rule else R.string.edit_rule)
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onDone) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    Button(
-                        onClick = viewModel::save,
-                        modifier = Modifier.padding(end = 12.dp),
-                    ) { Text(stringResource(R.string.save)) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+            AppHeader(
+                title = stringResource(
+                    if (state.isNew) R.string.new_rule else R.string.edit_rule
                 ),
-            )
+                onBack = onDone,
+            ) {
+                Button(
+                    onClick = viewModel::save,
+                    modifier = Modifier.padding(end = 8.dp),
+                ) { Text(stringResource(R.string.save)) }
+            }
         },
     ) { padding ->
         Column(

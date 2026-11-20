@@ -6,6 +6,7 @@ import com.claude.messages.data.db.ContentMatch
 import com.claude.messages.data.db.RuleImportance
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.VibrationPattern
+import com.claude.messages.data.prefs.Appearance
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.notifications.ChannelManager
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,7 @@ class MessagesApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Appearance.init(this)
         ChannelManager(this).ensureBaseChannels()
         scope.launch { seedStarterRules() }
 
