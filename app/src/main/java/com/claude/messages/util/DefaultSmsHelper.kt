@@ -10,14 +10,16 @@ import android.os.Build
 import android.provider.Settings
 import android.provider.Telephony
 import android.telephony.TelephonyManager
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
+import com.claude.messages.R
 
-/** Why the device cannot send right now, in the user's words. */
-enum class SendBlocker(val message: String) {
-    NO_SEND_PERMISSION("Messages doesn't have permission to send SMS. Grant it in app settings."),
-    NO_TELEPHONY("This device has no cellular radio, so it can't send SMS."),
-    NO_SIM("No SIM card detected. Insert a SIM to send messages."),
-    SIM_LOCKED("Your SIM is locked. Unlock it to send messages."),
+/** Why the device cannot send right now. The UI resolves the message. */
+enum class SendBlocker(@StringRes val messageRes: Int) {
+    NO_SEND_PERMISSION(R.string.block_no_permission),
+    NO_TELEPHONY(R.string.block_no_telephony),
+    NO_SIM(R.string.block_no_sim),
+    SIM_LOCKED(R.string.block_sim_locked),
 }
 
 /** Helpers for the default-SMS role, permissions, and send readiness. */
@@ -115,6 +117,16 @@ object DefaultSmsHelper {
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:${context.packageName}")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+    /** This app's notification settings in the system Settings app. */
+    fun notificationSettingsIntent(context: Context): Intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else {
+            appSettingsIntent(context)
         }
 
     /** The system's own "default apps" screen, as a fallback route. */

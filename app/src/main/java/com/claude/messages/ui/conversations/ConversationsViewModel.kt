@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.ThreadMeta
@@ -147,7 +148,7 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
         val custom = meta?.customName
         val name = when {
             !custom.isNullOrBlank() -> custom
-            memberNames.isEmpty() -> "(no recipient)"
+            memberNames.isEmpty() -> getApplication<Application>().getString(R.string.no_recipient)
             else -> memberNames.joinToString(", ")
         }
 

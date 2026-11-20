@@ -111,6 +111,7 @@ class RuleEngineTest {
     fun `an invalid regex never matches instead of crashing`() {
         val r = rule(contentMatch = ContentMatch.REGEX, contentValues = "([unclosed")
         assertNull(RuleEngine.evaluate(r, message(body = "anything")))
+        assertEquals(RuleProblem.BAD_REGEX, RuleEngine.validate(r.copy(name = "Codes")))
     }
 
     @Test
@@ -162,23 +163,29 @@ class RuleEngineTest {
 
     @Test
     fun `a rule without a name is rejected`() {
-        assertNotNull(RuleEngine.validate(rule(name = "")))
+        assertEquals(RuleProblem.NO_NAME, RuleEngine.validate(rule(name = "")))
     }
 
     @Test
     fun `a catch-all rule is rejected`() {
         val r = rule(name = "Everything", senderMatch = SenderMatch.ANY, contentMatch = ContentMatch.ANY)
-        assertNotNull(RuleEngine.validate(r))
+        assertEquals(RuleProblem.MATCHES_EVERYTHING, RuleEngine.validate(r))
     }
 
     @Test
     fun `a number rule with no numbers is rejected`() {
-        assertNotNull(RuleEngine.validate(rule(senderMatch = SenderMatch.NUMBERS, senderValues = "")))
+        assertEquals(
+            RuleProblem.NO_NUMBERS,
+            RuleEngine.validate(rule(senderMatch = SenderMatch.NUMBERS, senderValues = "")),
+        )
     }
 
     @Test
     fun `a keyword rule with no keywords is rejected`() {
-        assertNotNull(RuleEngine.validate(rule(contentMatch = ContentMatch.CONTAINS_ANY, contentValues = "")))
+        assertEquals(
+            RuleProblem.NO_KEYWORDS,
+            RuleEngine.validate(rule(contentMatch = ContentMatch.CONTAINS_ANY, contentValues = "")),
+        )
     }
 
     @Test
@@ -207,16 +214,33 @@ class RuleEngineTest {
         assertTrue(a.channelId == b.channelId)
     }
 
+    // ------------------------------------------------------- match reasons
+
     @Test
-    fun `describe summarises the conditions`() {
-        val r = rule(
-            senderMatch = SenderMatch.NUMBERS,
-            senderValues = "+15551234567",
-            contentMatch = ContentMatch.CONTAINS_ANY,
-            contentValues = "urgent",
-        )
-        val text = RuleEngine.describe(r)
-        assertTrue(text.contains("+15551234567"))
-        assertTrue(text.contains("urgent"))
+    fun `a number match reports which number matched`() {
+        val r = rule(senderMatch = SenderMatch.NUMBERS, senderValues = "+15550000000, +15551234567")
+        val match = RuleEngine.evaluate(r, message(address = "+15551234567"))
+        assertEquals(MatchReason.SenderNumber("+15551234567"), match?.senderReason)
+    }
+
+    @Test
+    fun `a keyword match reports which keyword matched`() {
+        val r = rule(contentMatch = ContentMatch.CONTAINS_ANY, contentValues = "bank\nOTP")
+        val match = RuleEngine.evaluate(r, message(body = "your otp is 1234"))
+        assertEquals(MatchReason.ContainsKeyword("OTP"), match?.contentReason)
+    }
+
+    @Test
+    fun `an unconstrained condition reports as unconstrained`() {
+        val r = rule(contentMatch = ContentMatch.CONTAINS_ANY, contentValues = "OTP")
+        val match = RuleEngine.evaluate(r, message(body = "OTP 1234"))
+        assertEquals(MatchReason.Unconstrained, match?.senderReason)
+    }
+
+    @Test
+    fun `a regex match reports the pattern`() {
+        val r = rule(contentMatch = ContentMatch.REGEX, contentValues = "\\b\\d{4,8}\\b")
+        val match = RuleEngine.evaluate(r, message(body = "Code 483920"))
+        assertEquals(MatchReason.MatchesRegex("\\b\\d{4,8}\\b"), match?.contentReason)
     }
 }

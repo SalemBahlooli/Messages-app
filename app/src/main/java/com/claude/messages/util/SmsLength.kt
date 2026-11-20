@@ -1,6 +1,8 @@
 package com.claude.messages.util
 
+import android.content.Context
 import android.telephony.SmsMessage
+import com.claude.messages.R
 
 /** Segment counting for the composer's hint. */
 object SmsLength {
@@ -12,15 +14,15 @@ object SmsLength {
      * Uses the platform's own calculation so GSM-7 versus UCS-2 encoding — which
      * halves the per-segment limit for Arabic and emoji — is accounted for.
      */
-    fun describe(draft: String): String? {
+    fun describe(context: Context, draft: String): String? {
         if (draft.isEmpty()) return null
         val counts = runCatching { SmsMessage.calculateLength(draft, false) }.getOrNull()
             ?: return null
         val segments = counts[0]
         val remaining = counts[2]
         return when {
-            segments > 1 -> "$segments messages · $remaining left in this one"
-            remaining <= 20 -> "$remaining characters left"
+            segments > 1 -> context.getString(R.string.sms_segments, segments, remaining)
+            remaining <= 20 -> context.getString(R.string.sms_chars_left, remaining)
             else -> null
         }
     }

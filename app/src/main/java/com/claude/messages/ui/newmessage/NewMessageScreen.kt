@@ -29,7 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.claude.messages.R
 import androidx.lifecycle.viewModelScope
 import com.claude.messages.data.model.Contact
 import com.claude.messages.data.repo.ContactsRepository
@@ -94,10 +96,10 @@ fun NewMessageScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New message") },
+                title = { Text(stringResource(R.string.new_message)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
                     }
                 },
             )
@@ -107,8 +109,8 @@ fun NewMessageScreen(
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                label = { Text("To") },
-                placeholder = { Text("Name or phone number") },
+                label = { Text(stringResource(R.string.to)) },
+                placeholder = { Text(stringResource(R.string.name_or_number)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             )
@@ -120,15 +122,15 @@ fun NewMessageScreen(
                     onClick = { onCompose(state.query.trim()) },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
-                    Text("Send to ${state.query.trim()}")
+                    Text(stringResource(R.string.send_to, state.query.trim()))
                 }
             }
 
             if (state.filtered.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.PersonSearch,
-                    title = "No contacts found",
-                    subtitle = "Type a phone number to start a new conversation.",
+                    title = stringResource(R.string.no_contacts_found),
+                    subtitle = stringResource(R.string.no_contacts_hint),
                 )
                 return@Column
             }

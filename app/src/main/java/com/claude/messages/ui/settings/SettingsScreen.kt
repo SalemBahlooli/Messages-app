@@ -1,21 +1,20 @@
 package com.claude.messages.ui.settings
 
 import android.Manifest
-import android.content.Intent
 import android.os.Build
-import android.provider.Settings
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
@@ -23,13 +22,13 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,10 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.claude.messages.R
 import com.claude.messages.ui.compose.SectionHeader
 import com.claude.messages.ui.compose.SettingRow
 import com.claude.messages.util.DefaultSmsHelper
@@ -49,9 +50,10 @@ import com.claude.messages.util.DefaultSmsHelper
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
+    contentPadding: PaddingValues,
     onOpenRules: () -> Unit,
     onRequestDefaultSms: () -> Unit,
+    onOpenSystemNotifications: () -> Unit,
 ) {
     val context = LocalContext.current
     // Recomputed whenever the screen comes forward, so a change made in system
@@ -66,15 +68,19 @@ fun SettingsScreen(
     val blocker = remember(probe) { DefaultSmsHelper.sendBlocker(context) }
 
     Scaffold(
+        modifier = Modifier.padding(contentPadding),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            androidx.compose.material3.TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(R.string.tab_settings),
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
     ) { padding ->
@@ -82,92 +88,102 @@ fun SettingsScreen(
             Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
         ) {
-            SectionHeader("Notifications")
+            SectionHeader(stringResource(R.string.settings_notifications))
             SettingRow(
-                title = "Notification rules",
-                subtitle = "Custom sounds and vibration per contact or keyword",
+                title = stringResource(R.string.notification_rules),
+                subtitle = stringResource(R.string.rules_subtitle),
                 leading = Icons.Default.Tune,
                 onClick = onOpenRules,
             )
             SettingRow(
-                title = "System notification settings",
-                subtitle = "Channel volumes, badges and Do Not Disturb",
+                title = stringResource(R.string.system_notification_settings),
+                subtitle = stringResource(R.string.system_notification_body),
                 leading = Icons.Default.Notifications,
-                onClick = {
-                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                    } else {
-                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                            .setData(android.net.Uri.parse("package:${context.packageName}"))
-                    }
-                    runCatching { context.startActivity(intent) }
-                },
+                onClick = onOpenSystemNotifications,
             )
 
-            HorizontalDivider()
-
-            SectionHeader("SMS")
+            SectionHeader(stringResource(R.string.settings_sms))
             SettingRow(
-                title = "Default SMS app",
-                subtitle = if (isDefault) "Messages is your default SMS app"
-                else "Tap to make Messages the default",
+                title = stringResource(R.string.default_sms_app),
+                subtitle = stringResource(
+                    if (isDefault) R.string.is_default_yes else R.string.is_default_no
+                ),
                 leading = if (isDefault) Icons.Default.CheckCircle else Icons.Default.Sms,
                 onClick = if (isDefault) null else onRequestDefaultSms,
             )
 
-            HorizontalDivider()
-
             // Ground truth for "why can't I send?" — what the system actually
             // reports, rather than what the app assumes.
-            SectionHeader("Diagnostics")
+            SectionHeader(stringResource(R.string.settings_diagnostics))
             Column(Modifier.padding(horizontal = 20.dp)) {
-                StatusLine("Default SMS app", isDefault)
-                StatusLine("Can send right now", blocker == null)
+                StatusLine(stringResource(R.string.diag_default), isDefault)
+                StatusLine(stringResource(R.string.diag_can_send), blocker == null)
                 blocker?.let {
                     Text(
-                        it.message,
+                        stringResource(it.messageRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                 }
-                StatusLine("Cellular radio", hasTelephony)
-                StatusLine("Read messages", DefaultSmsHelper.hasPermission(context, Manifest.permission.READ_SMS))
-                StatusLine("Send messages", DefaultSmsHelper.hasPermission(context, Manifest.permission.SEND_SMS))
-                StatusLine("Receive messages", DefaultSmsHelper.hasPermission(context, Manifest.permission.RECEIVE_SMS))
-                StatusLine("Contacts", DefaultSmsHelper.hasPermission(context, Manifest.permission.READ_CONTACTS))
+                StatusLine(stringResource(R.string.diag_radio), hasTelephony)
+                StatusLine(
+                    stringResource(R.string.diag_read),
+                    DefaultSmsHelper.hasPermission(context, Manifest.permission.READ_SMS),
+                )
+                StatusLine(
+                    stringResource(R.string.diag_send),
+                    DefaultSmsHelper.hasPermission(context, Manifest.permission.SEND_SMS),
+                )
+                StatusLine(
+                    stringResource(R.string.diag_receive),
+                    DefaultSmsHelper.hasPermission(context, Manifest.permission.RECEIVE_SMS),
+                )
+                StatusLine(
+                    stringResource(R.string.diag_contacts),
+                    DefaultSmsHelper.hasPermission(context, Manifest.permission.READ_CONTACTS),
+                )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     StatusLine(
-                        "Notifications",
-                        DefaultSmsHelper.hasPermission(context, Manifest.permission.POST_NOTIFICATIONS),
+                        stringResource(R.string.diag_notifications),
+                        DefaultSmsHelper.hasPermission(
+                            context, Manifest.permission.POST_NOTIFICATIONS,
+                        ),
                     )
                 }
 
-                Spacer(Modifier.padding(top = 8.dp))
+                Spacer(Modifier.height(12.dp))
                 Surface(
                     shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.padding(14.dp)) {
-                        DetailLine("SIM state", simState)
-                        DetailLine("System's SMS app", defaultPackage ?: "none")
-                        DetailLine("This app", context.packageName)
-                        DetailLine("Android", "API ${Build.VERSION.SDK_INT} (${Build.VERSION.RELEASE})")
-                        DetailLine("Device", "${Build.MANUFACTURER} ${Build.MODEL}")
+                        DetailLine(stringResource(R.string.diag_sim), simState)
+                        DetailLine(
+                            stringResource(R.string.diag_system_sms),
+                            defaultPackage ?: stringResource(R.string.none),
+                        )
+                        DetailLine(stringResource(R.string.diag_this_app), context.packageName)
+                        DetailLine(
+                            stringResource(R.string.diag_android),
+                            "API ${Build.VERSION.SDK_INT} (${Build.VERSION.RELEASE})",
+                        )
+                        DetailLine(
+                            stringResource(R.string.diag_device),
+                            "${Build.MANUFACTURER} ${Build.MODEL}",
+                        )
                     }
                 }
             }
 
-            HorizontalDivider(Modifier.padding(top = 16.dp))
-
-            SectionHeader("About")
+            SectionHeader(stringResource(R.string.settings_about))
             SettingRow(
-                title = "Messages",
-                subtitle = "A full SMS client with per-sender and per-keyword notification rules",
+                title = stringResource(R.string.app_name),
+                subtitle = stringResource(R.string.about_body),
                 leading = Icons.Default.Info,
             )
         }
@@ -182,14 +198,14 @@ private fun StatusLine(label: String, ok: Boolean) {
     ) {
         Icon(
             if (ok) Icons.Default.CheckCircle else Icons.Default.Cancel,
-            contentDescription = if (ok) "Yes" else "No",
+            contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
         )
         Spacer(Modifier.width(12.dp))
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(
-            if (ok) "Yes" else "No",
+            stringResource(if (ok) R.string.yes else R.string.no),
             style = MaterialTheme.typography.labelMedium,
             color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
         )
@@ -203,7 +219,7 @@ private fun DetailLine(label: String, value: String) {
             label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(130.dp),
+            modifier = Modifier.width(140.dp),
         )
         Text(
             value,

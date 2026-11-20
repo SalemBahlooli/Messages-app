@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.data.db.ThreadMeta
 import com.claude.messages.data.model.Message
@@ -151,7 +152,7 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
         if (body.isEmpty() || current.sending) return
 
         if (current.recipients.isEmpty()) {
-            _state.update { it.copy(errorMessage = "No recipient for this conversation") }
+            _state.update { it.copy(errorMessage = getApplication<Application>().getString(R.string.err_no_recipient)) }
             return
         }
 
@@ -207,7 +208,7 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
             val target = message.address.takeIf { it.isNotBlank() }
                 ?: _state.value.recipients.firstOrNull()
             if (target == null) {
-                _state.update { it.copy(errorMessage = "No recipient for this message") }
+                _state.update { it.copy(errorMessage = getApplication<Application>().getString(R.string.err_no_recipient)) }
                 return@launch
             }
             when (val result = sender.send(listOf(target), message.body)) {

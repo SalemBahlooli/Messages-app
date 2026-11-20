@@ -72,7 +72,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
 import com.claude.messages.data.model.Message
 import com.claude.messages.ui.compose.Avatar
@@ -129,10 +132,10 @@ fun ThreadScreen(
                                 maxLines = 1,
                             )
                             val subtitle = when {
-                                state.muted -> "Muted"
+                                state.muted -> stringResource(R.string.muted)
                                 state.forcedRuleId != null -> state.availableRules
                                     .firstOrNull { it.id == state.forcedRuleId }
-                                    ?.let { "Rule: ${it.name}" }
+                                    ?.let { "${stringResource(R.string.rule_for_chat)}: ${it.name}" }
 
                                 else -> null
                             }
@@ -148,19 +151,19 @@ fun ThreadScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = leave) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { ruleDialogOpen = true }) {
-                        Icon(Icons.Default.Tune, "Notification rule")
+                        Icon(Icons.Default.Tune, stringResource(R.string.rule_for_chat))
                     }
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, "More")
+                        Icon(Icons.Default.MoreVert, stringResource(R.string.more))
                     }
                     DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text(if (state.muted) "Unmute" else "Mute notifications") },
+                            text = { Text(stringResource(if (state.muted) R.string.unmute else R.string.mute_notifications)) },
                             leadingIcon = {
                                 Icon(
                                     if (state.muted) Icons.Default.NotificationsActive
@@ -171,12 +174,12 @@ fun ThreadScreen(
                             onClick = { menuOpen = false; viewModel.toggleMute() },
                         )
                         DropdownMenuItem(
-                            text = { Text("Notification rule") },
+                            text = { Text(stringResource(R.string.rule_for_chat)) },
                             leadingIcon = { Icon(Icons.Default.Tune, null) },
                             onClick = { menuOpen = false; ruleDialogOpen = true },
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete conversation") },
+                            text = { Text(stringResource(R.string.delete_conversation)) },
                             leadingIcon = { Icon(Icons.Default.Delete, null) },
                             onClick = { menuOpen = false; viewModel.deleteThread(onBack) },
                         )
@@ -261,7 +264,7 @@ private fun DaySeparator(millis: Long) {
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             Text(
-                text = Formatting.daySeparator(millis),
+                text = Formatting.daySeparator(LocalContext.current, millis),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -340,29 +343,29 @@ private fun MessageBubble(
                     message.isFailed -> {
                         Icon(
                             Icons.Default.ErrorOutline,
-                            "Not sent",
+                            stringResource(R.string.not_sent),
                             Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.error,
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            "Not sent",
+                            stringResource(R.string.not_sent),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
                         TextButton(onClick = onRetry, modifier = Modifier.height(30.dp)) {
                             Icon(Icons.Default.Refresh, null, Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Retry", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.retry), style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
-                    message.isSending -> StatusLabel(Icons.Default.Schedule, "Sending")
+                    message.isSending -> StatusLabel(Icons.Default.Schedule, stringResource(R.string.sending))
 
                     outgoing && message.status == Message.STATUS_COMPLETE ->
-                        StatusLabel(Icons.Default.DoneAll, "Delivered", highlight = true)
+                        StatusLabel(Icons.Default.DoneAll, stringResource(R.string.delivered), highlight = true)
 
-                    outgoing -> StatusLabel(Icons.Default.Check, "Sent")
+                    outgoing -> StatusLabel(Icons.Default.Check, stringResource(R.string.sent))
                 }
             }
         }
@@ -413,7 +416,7 @@ private fun Composer(
                         value = draft,
                         onValueChange = onDraftChange,
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Text message") },
+                        placeholder = { Text(stringResource(R.string.text_message)) },
                         maxLines = 6,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -423,7 +426,7 @@ private fun Composer(
                         ),
                     )
                     // Only worth showing once a message will actually be split.
-                    val info = SmsLength.describe(draft)
+                    val info = SmsLength.describe(LocalContext.current, draft)
                     if (info != null) {
                         Text(
                             text = info,
@@ -446,7 +449,7 @@ private fun Composer(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, "Send")
+                Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.send))
             }
         }
     }
@@ -461,7 +464,7 @@ private fun MessageActionsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Message") },
+        title = { Text(stringResource(R.string.message_label)) },
         text = {
             Column {
                 Text(
@@ -481,14 +484,14 @@ private fun MessageActionsDialog(
             TextButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Delete")
+                Text(stringResource(R.string.delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onCopy) {
                 Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Copy")
+                Text(stringResource(R.string.copy))
             }
         },
     )
@@ -503,18 +506,18 @@ private fun RulePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Notification rule") },
+        title = { Text(stringResource(R.string.rule_for_chat)) },
         text = {
             Column {
                 Text(
-                    "Pin a rule to this conversation, or let the conditions decide.",
+                    stringResource(R.string.rule_for_chat_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
                 RuleOption(
-                    label = "Automatic",
-                    detail = "Match by conditions",
+                    label = stringResource(R.string.rule_automatic),
+                    detail = stringResource(R.string.rule_automatic_hint),
                     selected = selectedId == null,
                     onClick = { onSelect(null) },
                 )
@@ -528,14 +531,14 @@ private fun RulePickerDialog(
                 }
                 if (rules.isEmpty()) {
                     Text(
-                        "No rules yet — create one from the tuner icon on the conversation list.",
+                        stringResource(R.string.no_rules_inline),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
     )
 }
 

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.telephony.SmsManager
 import android.util.Log
+import com.claude.messages.R
 import com.claude.messages.data.model.Message
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.util.DefaultSmsHelper
@@ -29,12 +30,12 @@ class SmsSender(private val context: Context) {
         subId: Int = -1,
     ): SendResult = withContext(Dispatchers.IO) {
         val clean = recipients.map { it.trim() }.filter { it.isNotEmpty() }
-        if (clean.isEmpty()) return@withContext SendResult.Failure("No recipient for this message")
-        if (body.isEmpty()) return@withContext SendResult.Failure("Message is empty")
+        if (clean.isEmpty()) return@withContext SendResult.Failure(context.getString(R.string.err_no_recipient))
+        if (body.isEmpty()) return@withContext SendResult.Failure(context.getString(R.string.err_message_empty))
 
         // Check what would stop the radio before touching anything.
         DefaultSmsHelper.sendBlocker(context)?.let {
-            return@withContext SendResult.Failure(it.message)
+            return@withContext SendResult.Failure(context.getString(it.messageRes))
         }
 
         val repo = ServiceLocator.smsRepository(context)
@@ -52,7 +53,7 @@ class SmsSender(private val context: Context) {
 
             val sent = runCatching {
                 val manager = smsManager(subId)
-                    ?: error("SMS service unavailable on this device")
+                    ?: error(context.getString(R.string.err_sms_unavailable))
                 val parts = manager.divideMessage(body)
                 val sentIntents = ArrayList<PendingIntent?>(parts.size)
                 val deliveredIntents = ArrayList<PendingIntent?>(parts.size)
@@ -86,8 +87,7 @@ class SmsSender(private val context: Context) {
             failure != null -> SendResult.Failure(failure)
             couldNotStore -> SendResult.Success(
                 lastThreadId,
-                warning = "Sent, but it wasn't saved to your conversations — " +
-                    "Messages isn't your default SMS app.",
+                warning = context.getString(R.string.err_not_saved),
             )
 
             else -> SendResult.Success(lastThreadId)
@@ -96,14 +96,13 @@ class SmsSender(private val context: Context) {
 
     /** Turns a platform exception into something worth showing a person. */
     private fun describe(error: Throwable?): String = when {
-        error is SecurityException ->
-            "Android blocked the send. Check that Messages has the SMS permission."
+        error is SecurityException -> context.getString(R.string.err_security)
 
         error?.message?.contains("permission", ignoreCase = true) == true ->
-            "Android blocked the send: ${error.message}"
+            context.getString(R.string.err_blocked_detail, error.message)
 
-        error?.message.isNullOrBlank() -> "The system rejected the message."
-        else -> "Couldn't send: ${error?.message}"
+        error?.message.isNullOrBlank() -> context.getString(R.string.err_rejected)
+        else -> context.getString(R.string.err_couldnt_send, error?.message.orEmpty())
     }
 
     @Suppress("DEPRECATION")

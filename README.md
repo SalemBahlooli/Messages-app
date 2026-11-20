@@ -76,6 +76,26 @@ keeping the old sound.
 - Quick "respond via message" replies from the incoming-call screen
 - Material 3 with dynamic colour and full dark theme
 
+## Interface
+
+Three tabs — **Chats**, **Rules**, **Settings** — so the notification rules that
+are the point of the app are one tap away rather than hidden behind an app-bar
+icon. Chats keeps pinned conversations in their own section, a round search
+field, unread shown as a dot rather than a count, and a selection mode for bulk
+pin / mute / archive / delete. A conversation shows grouped bubbles whose
+corners tighten between consecutive messages from the same side, day separators
+as pills, and delivery state per message.
+
+The rule editor reads as the sentence it represents: a **When** card for the
+conditions and an **Alert me like this** card for the sound, vibration, urgency,
+colour and badge, with detail fields appearing only when the choice above them
+needs one. A built-in tester explains which condition matched.
+
+Fully translated into **Arabic**, with RTL layout and auto-mirrored icons; the
+app follows the phone's language. All user-facing text lives in resources —
+including the rule engine's match explanations, which are returned as structured
+data and formatted in the presentation layer so they render in any locale.
+
 ## Architecture
 
 ```
@@ -88,7 +108,8 @@ notifications/
   ChannelManager   per-rule channel lifecycle
   MessageNotifier  builds the notification, applies the winning rule
 sms/          SMS_DELIVER / WAP_PUSH receivers, sender, status receivers
-ui/           Compose screens + ViewModels, Navigation
+notifications/RuleTextFormatter  renders engine results in the user's language
+ui/           Compose screens + ViewModels, bottom-nav Navigation
 ```
 
 Conversations and messages live in the **system SMS provider**, so nothing is
@@ -99,7 +120,7 @@ nowhere to store — rules, pins, archives, mutes, drafts — lives in Room.
 
 ```bash
 ./gradlew assembleDebug     # APK at app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest # 30 unit tests covering the rule engine and number matching
+./gradlew testDebugUnitTest # 40 unit tests covering the rule engine, matching and caching
 ```
 
 Requires JDK 17+ and Android SDK 34.

@@ -3,6 +3,7 @@ package com.claude.messages.ui.rules
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,21 +14,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,57 +36,81 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.claude.messages.R
 import com.claude.messages.data.db.NotificationRule
-import com.claude.messages.data.db.RuleImportance
+import com.claude.messages.notifications.RuleTextFormatter
 import com.claude.messages.ui.compose.EmptyState
 
 /**
- * Lists the user's notification rules in evaluation order. The first enabled
- * rule that matches an incoming message decides how it is announced.
+ * The rules tab. Rules are listed in evaluation order; the first enabled rule
+ * that matches an incoming message decides how it is announced.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RulesListScreen(
     viewModel: RulesViewModel,
-    onBack: () -> Unit,
+    contentPadding: PaddingValues,
     onAddRule: () -> Unit,
     onEditRule: (Long) -> Unit,
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val formatter = remember(context) { RuleTextFormatter(context) }
 
     Scaffold(
+        modifier = Modifier.padding(contentPadding),
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text("Notification rules") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                title = {
+                    Column {
+                        Text(
+                            stringResource(R.string.notification_rules),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                        Text(
+                            stringResource(R.string.rules_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddRule) { Icon(Icons.Default.Add, "New rule") }
+            ExtendedFloatingActionButton(
+                onClick = onAddRule,
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text(stringResource(R.string.new_rule)) },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
         },
     ) { padding ->
         if (rules.isEmpty()) {
             Column(Modifier.padding(padding)) {
                 EmptyState(
                     icon = Icons.Default.Tune,
-                    title = "No rules yet",
-                    subtitle = "Create a rule to give a specific contact — or messages " +
-                        "containing certain words — their own ringtone, vibration and urgency.",
-                    actionLabel = "Create a rule",
+                    title = stringResource(R.string.no_rules_title),
+                    subtitle = stringResource(R.string.no_rules_body),
+                    actionLabel = stringResource(R.string.create_rule),
                     onAction = onAddRule,
                 )
             }
@@ -95,23 +119,22 @@ fun RulesListScreen(
 
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
                 Text(
-                    "Rules are checked from top to bottom. The first match wins.",
+                    stringResource(R.string.rules_order_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = 6.dp),
                 )
             }
             itemsIndexed(rules, key = { _, r -> r.id }) { index, rule ->
                 RuleCard(
                     rule = rule,
-                    description = viewModel.describe(rule),
+                    description = formatter.describe(rule),
+                    position = index + 1,
                     isFirst = index == 0,
                     isLast = index == rules.lastIndex,
                     onClick = { onEditRule(rule.id) },
@@ -129,6 +152,7 @@ fun RulesListScreen(
 private fun RuleCard(
     rule: NotificationRule,
     description: String,
+    position: Int,
     isFirst: Boolean,
     isLast: Boolean,
     onClick: () -> Unit,
@@ -148,7 +172,7 @@ private fun RuleCard(
     ) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Tonal badge carries the rule's own accent colour and badge text.
+                // The badge doubles as the rule's position in evaluation order.
                 Surface(
                     shape = CircleShape,
                     color = accent.copy(alpha = if (rule.enabled) 0.18f else 0.08f),
@@ -162,11 +186,10 @@ private fun RuleCard(
                         if (rule.titlePrefix.isNotBlank()) {
                             Text(rule.titlePrefix.take(2))
                         } else {
-                            Icon(
-                                Icons.Default.NotificationsActive,
-                                null,
-                                Modifier.size(20.dp),
-                                tint = accent,
+                            Text(
+                                "$position",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = accent,
                             )
                         }
                     }
@@ -197,31 +220,34 @@ private fun RuleCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Attribute(Icons.Default.MusicNote, rule.soundLabel)
                 Spacer(Modifier.width(12.dp))
-                Attribute(Icons.Default.Vibration, rule.vibration.label)
+                Attribute(Icons.Default.Vibration, stringResource(rule.vibration.labelRes))
                 Spacer(Modifier.width(12.dp))
                 Attribute(
                     Icons.Default.PriorityHigh,
-                    when (rule.importance) {
-                        RuleImportance.SILENT -> "Silent"
-                        RuleImportance.LOW -> "Quiet"
-                        RuleImportance.NORMAL -> "Normal"
-                        RuleImportance.HIGH -> "Urgent"
-                    },
-                    highlight = rule.importance == RuleImportance.HIGH,
+                    stringResource(rule.importance.shortLabelRes),
+                    highlight = rule.importance == com.claude.messages.data.db.RuleImportance.HIGH,
                 )
             }
 
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onMoveUp, enabled = !isFirst) {
-                    Icon(Icons.Default.ArrowUpward, "Move up", Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.ArrowUpward,
+                        stringResource(R.string.move_up),
+                        Modifier.size(18.dp),
+                    )
                 }
                 IconButton(onClick = onMoveDown, enabled = !isLast) {
-                    Icon(Icons.Default.ArrowDownward, "Move down", Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.ArrowDownward,
+                        stringResource(R.string.move_down),
+                        Modifier.size(18.dp),
+                    )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
-                        "Delete rule",
+                        stringResource(R.string.delete_rule),
                         Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.error,
                     )
@@ -233,11 +259,7 @@ private fun RuleCard(
 
 /** One sound/vibration/urgency fact on a rule card. */
 @Composable
-private fun Attribute(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    highlight: Boolean = false,
-) {
+private fun Attribute(icon: ImageVector, label: String, highlight: Boolean = false) {
     val tint = if (highlight) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.onSurfaceVariant
     Row(verticalAlignment = Alignment.CenterVertically) {

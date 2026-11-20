@@ -37,8 +37,6 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -64,6 +62,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.claude.messages.R
 import com.claude.messages.data.model.Conversation
 import com.claude.messages.ui.compose.Avatar
 import com.claude.messages.ui.compose.EmptyState
@@ -81,10 +82,9 @@ import com.claude.messages.util.Formatting
 @Composable
 fun ConversationsScreen(
     viewModel: ConversationsViewModel,
+    contentPadding: PaddingValues,
     onOpenThread: (Long) -> Unit,
     onNewMessage: () -> Unit,
-    onOpenRules: () -> Unit,
-    onOpenSettings: () -> Unit,
     onRequestDefaultSms: () -> Unit,
     onGrantPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
@@ -100,6 +100,7 @@ fun ConversationsScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
     Scaffold(
+        modifier = Modifier.padding(contentPadding),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             if (state.inSelectionMode) {
@@ -119,29 +120,35 @@ fun ConversationsScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = if (state.showArchived) "Archived" else "Messages",
+                            text = stringResource(
+                                if (state.showArchived) R.string.archived else R.string.app_name
+                            ),
                             style = MaterialTheme.typography.headlineSmall,
                         )
                     },
                     navigationIcon = {
                         if (state.showArchived) {
                             IconButton(onClick = viewModel::toggleArchivedView) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    stringResource(R.string.back),
+                                )
                             }
                         }
                     },
                     actions = {
-                        IconButton(onClick = onOpenRules) {
-                            Icon(Icons.Default.Tune, "Notification rules")
-                        }
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Default.MoreVert, "More")
-                            }
-                            DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
-                                if (!state.showArchived) {
+                        if (!state.showArchived && state.archivedCount > 0) {
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Default.MoreVert, stringResource(R.string.more))
+                                }
+                                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Archived (${state.archivedCount})") },
+                                        text = {
+                                            Text(
+                                                "${stringResource(R.string.archived)} (${state.archivedCount})"
+                                            )
+                                        },
                                         leadingIcon = { Icon(Icons.Default.Archive, null) },
                                         onClick = {
                                             menuOpen = false
@@ -149,16 +156,6 @@ fun ConversationsScreen(
                                         },
                                     )
                                 }
-                                DropdownMenuItem(
-                                    text = { Text("Notification rules") },
-                                    leadingIcon = { Icon(Icons.Default.Tune, null) },
-                                    onClick = { menuOpen = false; onOpenRules() },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Settings") },
-                                    leadingIcon = { Icon(Icons.Default.Settings, null) },
-                                    onClick = { menuOpen = false; onOpenSettings() },
-                                )
                             }
                         }
                     },
@@ -173,7 +170,7 @@ fun ConversationsScreen(
                 ExtendedFloatingActionButton(
                     onClick = onNewMessage,
                     icon = { Icon(Icons.Default.Edit, null) },
-                    text = { Text("Start chat") },
+                    text = { Text(stringResource(R.string.start_chat)) },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -205,41 +202,100 @@ fun ConversationsScreen(
                 )
             }
 
-            if (state.loading) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
+            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
             when {
                 state.searching -> SearchResults(state.searchResults, onOpenThread)
 
                 state.conversations.isEmpty() && !state.loading -> EmptyState(
                     icon = Icons.AutoMirrored.Filled.Message,
-                    title = if (state.showArchived) "Nothing archived" else "No conversations yet",
+                    title = stringResource(
+                        if (state.showArchived) R.string.nothing_archived
+                        else R.string.no_conversations
+                    ),
                     subtitle = if (state.showArchived) null
-                    else "Tap Start chat to send your first message.",
+                    else stringResource(R.string.no_conversations_hint),
                 )
 
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 96.dp, top = 4.dp),
-                ) {
-                    items(state.conversations, key = { it.threadId }) { conversation ->
-                        ConversationRow(
-                            conversation = conversation,
-                            selected = conversation.threadId in state.selected,
-                            onClick = {
-                                if (state.inSelectionMode) {
-                                    viewModel.toggleSelection(conversation.threadId)
-                                } else {
-                                    onOpenThread(conversation.threadId)
-                                }
-                            },
-                            onLongClick = { viewModel.toggleSelection(conversation.threadId) },
-                        )
-                    }
+                else -> ConversationList(
+                    state = state,
+                    onOpenThread = onOpenThread,
+                    onToggleSelection = viewModel::toggleSelection,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationList(
+    state: ConversationsUiState,
+    onOpenThread: (Long) -> Unit,
+    onToggleSelection: (Long) -> Unit,
+) {
+    val pinned = state.conversations.filter { it.pinned }
+    val rest = state.conversations.filterNot { it.pinned }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 96.dp, top = 4.dp),
+    ) {
+        if (pinned.isNotEmpty()) {
+            item(key = "header_pinned") {
+                ListHeader(stringResource(R.string.pinned), Icons.Default.PushPin)
+            }
+            items(pinned, key = { it.threadId }) { conversation ->
+                ConversationRow(
+                    conversation = conversation,
+                    selected = conversation.threadId in state.selected,
+                    onClick = {
+                        if (state.inSelectionMode) onToggleSelection(conversation.threadId)
+                        else onOpenThread(conversation.threadId)
+                    },
+                    onLongClick = { onToggleSelection(conversation.threadId) },
+                )
+            }
+            if (rest.isNotEmpty()) {
+                item(key = "header_all") {
+                    ListHeader(stringResource(R.string.all_messages), null)
                 }
             }
         }
+
+        items(rest, key = { it.threadId }) { conversation ->
+            ConversationRow(
+                conversation = conversation,
+                selected = conversation.threadId in state.selected,
+                onClick = {
+                    if (state.inSelectionMode) onToggleSelection(conversation.threadId)
+                    else onOpenThread(conversation.threadId)
+                },
+                onLongClick = { onToggleSelection(conversation.threadId) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ListHeader(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector?) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(
+                icon,
+                null,
+                Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -258,28 +314,43 @@ private fun SelectionTopBar(
     onMute: () -> Unit,
 ) {
     TopAppBar(
-        title = { Text("$count selected", style = MaterialTheme.typography.titleLarge) },
+        title = {
+            Text(
+                pluralStringResource(R.plurals.selected_count, count, count),
+                style = MaterialTheme.typography.titleLarge,
+            )
+        },
         navigationIcon = {
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cancel") }
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, stringResource(R.string.cancel))
+            }
         },
         actions = {
             IconButton(onClick = onPin) {
-                Icon(Icons.Default.PushPin, if (allPinned) "Unpin" else "Pin")
+                Icon(
+                    Icons.Default.PushPin,
+                    stringResource(if (allPinned) R.string.unpin else R.string.pin),
+                )
             }
             IconButton(onClick = onMute) {
                 Icon(
-                    if (allMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
-                    if (allMuted) "Unmute" else "Mute",
+                    if (allMuted) Icons.Default.NotificationsActive
+                    else Icons.Default.NotificationsOff,
+                    stringResource(if (allMuted) R.string.unmute else R.string.mute),
                 )
             }
-            IconButton(onClick = onMarkRead) { Icon(Icons.Default.DoneAll, "Mark read") }
+            IconButton(onClick = onMarkRead) {
+                Icon(Icons.Default.DoneAll, stringResource(R.string.mark_read))
+            }
             IconButton(onClick = onArchive) {
                 Icon(
                     if (showArchived) Icons.Default.Unarchive else Icons.Default.Archive,
-                    if (showArchived) "Unarchive" else "Archive",
+                    stringResource(if (showArchived) R.string.unarchive else R.string.archive),
                 )
             }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete") }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, stringResource(R.string.delete))
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -291,9 +362,7 @@ private fun SelectionTopBar(
 @Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -301,11 +370,13 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search messages") },
+            placeholder = { Text(stringResource(R.string.search_messages)) },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
                 if (query.isNotEmpty()) {
-                    IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Clear") }
+                    IconButton(onClick = onClear) {
+                        Icon(Icons.Default.Close, stringResource(R.string.clear))
+                    }
                 }
             },
             singleLine = true,
@@ -324,7 +395,10 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
 @Composable
 private fun SearchResults(results: List<SearchHit>, onOpenThread: (Long) -> Unit) {
     if (results.isEmpty()) {
-        EmptyState(icon = Icons.Default.Search, title = "No matching messages")
+        EmptyState(
+            icon = Icons.Default.Search,
+            title = stringResource(R.string.no_matching_messages),
+        )
         return
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -402,25 +476,17 @@ private fun ConversationRow(
                     Text(
                         text = conversation.displayName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (conversation.hasUnread) FontWeight.Bold else FontWeight.Medium,
+                        fontWeight = if (conversation.hasUnread) FontWeight.Bold
+                        else FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (conversation.pinned) {
-                        Spacer(Modifier.width(6.dp))
-                        Icon(
-                            Icons.Default.PushPin,
-                            "Pinned",
-                            Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                     if (conversation.muted) {
                         Spacer(Modifier.width(6.dp))
                         Icon(
                             Icons.Default.NotificationsOff,
-                            "Muted",
+                            stringResource(R.string.muted),
                             Modifier.size(13.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -440,7 +506,7 @@ private fun ConversationRow(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = conversation.snippet.ifBlank { "No messages" },
+                        text = conversation.snippet.ifBlank { stringResource(R.string.no_messages) },
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (conversation.hasUnread) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant,

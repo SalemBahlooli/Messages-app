@@ -11,6 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,48 +29,57 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.claude.messages.R
 import com.claude.messages.data.db.ContentMatch
 import com.claude.messages.data.db.RuleImportance
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.VibrationPattern
-import com.claude.messages.ui.compose.SectionHeader
+import com.claude.messages.notifications.RuleTextFormatter
 import com.claude.messages.ui.theme.AvatarColors
 
 /**
- * Editor for a single notification rule: the conditions that select a message,
- * and the sound / vibration / urgency it should get.
+ * Editor for one notification rule, laid out as the sentence it represents:
+ * **When** a message matches these conditions, **alert me like this**. Each
+ * half is its own card so the two halves never blur together, and detail fields
+ * appear only once the choice above them needs them.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RuleEditorScreen(
     viewModel: RulesViewModel,
@@ -76,6 +88,7 @@ fun RuleEditorScreen(
     val state by viewModel.editor.collectAsStateWithLifecycle()
     val rule = state.rule
     val context = LocalContext.current
+    val formatter = remember(context) { RuleTextFormatter(context) }
 
     LaunchedEffect(state.saved) {
         if (state.saved) {
@@ -84,11 +97,11 @@ fun RuleEditorScreen(
         }
     }
 
-    // System ringtone picker — returns the chosen tone's content URI.
     val ringtonePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
+            @Suppress("DEPRECATION")
             val uri: Uri? = result.data
                 ?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             viewModel.setSound(uri)
@@ -96,17 +109,28 @@ fun RuleEditorScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isNew) "New rule" else "Edit rule") },
+                title = {
+                    Text(
+                        stringResource(if (state.isNew) R.string.new_rule else R.string.edit_rule)
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onDone) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
                     }
                 },
                 actions = {
-                    TextButton(onClick = viewModel::save) { Text("Save") }
+                    Button(
+                        onClick = viewModel::save,
+                        modifier = Modifier.padding(end = 12.dp),
+                    ) { Text(stringResource(R.string.save)) }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
     ) { padding ->
@@ -115,265 +139,272 @@ fun RuleEditorScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 32.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            state.error?.let { error ->
+            state.problem?.let { problem ->
                 Card(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                     ),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(error, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        formatter.problemText(problem),
+                        Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
                 }
             }
 
             OutlinedTextField(
                 value = rule.name,
                 onValueChange = { name -> viewModel.updateRule { it.copy(name = name) } },
-                label = { Text("Rule name") },
-                placeholder = { Text("e.g. Family, Work alerts, Bank codes") },
+                label = { Text(stringResource(R.string.rule_name)) },
+                placeholder = { Text(stringResource(R.string.rule_name_hint)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            // ------------------------------------------------------ WHO
-            SectionHeader("When the sender is")
-            ChipRow(
-                options = SenderMatch.entries.map { it to it.label() },
-                selected = rule.senderMatch,
-                onSelect = { match -> viewModel.updateRule { it.copy(senderMatch = match) } },
-            )
-            if (rule.senderMatch == SenderMatch.NUMBERS) {
-                OutlinedTextField(
-                    value = rule.senderValues,
-                    onValueChange = { v -> viewModel.updateRule { it.copy(senderValues = v) } },
-                    label = { Text("Phone numbers") },
-                    supportingText = { Text("Separate several numbers with commas") },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            // ---------------------------------------------------------- WHEN
+            SectionCard(
+                title = stringResource(R.string.section_when),
+                icon = Icons.Default.Tune,
+            ) {
+                FieldLabel(stringResource(R.string.from_sender))
+                ChipRow(
+                    options = SenderMatch.entries.map { it to formatter.label(it) },
+                    selected = rule.senderMatch,
+                    onSelect = { match -> viewModel.updateRule { it.copy(senderMatch = match) } },
                 )
-                if (state.contacts.isNotEmpty()) {
-                    Text(
-                        "Tap a contact to add their number",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp),
+                if (rule.senderMatch == SenderMatch.NUMBERS) {
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = rule.senderValues,
+                        onValueChange = { v -> viewModel.updateRule { it.copy(senderValues = v) } },
+                        label = { Text(stringResource(R.string.phone_numbers)) },
+                        supportingText = { Text(stringResource(R.string.phone_numbers_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        state.contacts.take(30).forEach { contact ->
-                            AssistChip(
-                                onClick = {
-                                    viewModel.updateRule {
-                                        val existing = it.senderNumbers
-                                        if (existing.any { n -> n == contact.number }) it
-                                        else it.copy(
-                                            senderValues = (existing + contact.number)
-                                                .joinToString(", ")
-                                        )
-                                    }
-                                },
-                                label = { Text("${contact.name} · ${contact.number}") },
-                                modifier = Modifier.padding(vertical = 2.dp),
-                            )
+                    if (state.contacts.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.tap_contact_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            state.contacts.take(24).forEach { contact ->
+                                AssistChip(
+                                    onClick = {
+                                        viewModel.updateRule {
+                                            val existing = it.senderNumbers
+                                            if (existing.any { n -> n == contact.number }) it
+                                            else it.copy(
+                                                senderValues =
+                                                    (existing + contact.number).joinToString(", ")
+                                            )
+                                        }
+                                    },
+                                    label = { Text(contact.name) },
+                                )
+                            }
                         }
                     }
                 }
+
+                Spacer(Modifier.height(16.dp))
+                FieldLabel(stringResource(R.string.and_message))
+                ChipRow(
+                    options = ContentMatch.entries.map { it to formatter.label(it) },
+                    selected = rule.contentMatch,
+                    onSelect = { match -> viewModel.updateRule { it.copy(contentMatch = match) } },
+                )
+                if (rule.contentMatch != ContentMatch.ANY) {
+                    val isRegex = rule.contentMatch == ContentMatch.REGEX
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = rule.contentValues,
+                        onValueChange = { v -> viewModel.updateRule { it.copy(contentValues = v) } },
+                        label = {
+                            Text(stringResource(if (isRegex) R.string.regex_label else R.string.keywords))
+                        },
+                        supportingText = {
+                            Text(stringResource(if (isRegex) R.string.regex_hint else R.string.keywords_hint))
+                        },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    SwitchRow(
+                        title = stringResource(R.string.case_sensitive),
+                        checked = rule.caseSensitive,
+                        onCheckedChange = { v ->
+                            viewModel.updateRule { it.copy(caseSensitive = v) }
+                        },
+                    )
+                }
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // ---------------------------------------------------------- THEN
+            SectionCard(
+                title = stringResource(R.string.section_then),
+                icon = Icons.Default.NotificationsActive,
+            ) {
+                RowItem(
+                    icon = Icons.Default.MusicNote,
+                    title = stringResource(R.string.notification_sound),
+                    subtitle = rule.soundLabel,
+                    onClick = {
+                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                RingtoneManager.TYPE_NOTIFICATION,
+                            )
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_TITLE,
+                                context.getString(R.string.sound_for_rule),
+                            )
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                rule.soundUri?.let(Uri::parse),
+                            )
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
+                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                            )
+                        }
+                        runCatching { ringtonePicker.launch(intent) }
+                    },
+                )
 
-            // ------------------------------------------------------ WHAT
-            SectionHeader("And the message")
-            ChipRow(
-                options = ContentMatch.entries.map { it to it.label() },
-                selected = rule.contentMatch,
-                onSelect = { match -> viewModel.updateRule { it.copy(contentMatch = match) } },
-            )
-            if (rule.contentMatch != ContentMatch.ANY) {
+                Spacer(Modifier.height(12.dp))
+                FieldLabel(stringResource(R.string.vibration))
+                ChipRow(
+                    options = VibrationPattern.entries.map { it to stringResource(it.labelRes) },
+                    selected = rule.vibration,
+                    onSelect = { pattern ->
+                        viewModel.updateRule { it.copy(vibration = pattern) }
+                        viewModel.previewVibration(pattern)
+                    },
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.vibration_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(16.dp))
+                FieldLabel(stringResource(R.string.urgency))
+                ChipRow(
+                    options = RuleImportance.entries.map { it to stringResource(it.labelRes) },
+                    selected = rule.importance,
+                    onSelect = { imp -> viewModel.updateRule { it.copy(importance = imp) } },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                FieldLabel(stringResource(R.string.accent_colour))
+                ColorPicker(
+                    selected = rule.accentColor,
+                    onSelect = { color -> viewModel.updateRule { it.copy(accentColor = color) } },
+                )
+
+                Spacer(Modifier.height(14.dp))
                 OutlinedTextField(
-                    value = rule.contentValues,
-                    onValueChange = { v -> viewModel.updateRule { it.copy(contentValues = v) } },
-                    label = {
-                        Text(
-                            if (rule.contentMatch == ContentMatch.REGEX) "Regular expression"
-                            else "Keywords"
-                        )
-                    },
-                    supportingText = {
-                        Text(
-                            if (rule.contentMatch == ContentMatch.REGEX) {
-                                "e.g. \\\\b\\\\d{4,8}\\\\b to match a numeric code"
-                            } else {
-                                "One keyword per line"
-                            }
-                        )
-                    },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    value = rule.titlePrefix,
+                    onValueChange = { v -> viewModel.updateRule { it.copy(titlePrefix = v) } },
+                    label = { Text(stringResource(R.string.title_badge)) },
+                    placeholder = { Text(stringResource(R.string.title_badge_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                SwitchRow(
+                    title = stringResource(R.string.bypass_dnd),
+                    subtitle = stringResource(R.string.bypass_dnd_body),
+                    checked = rule.bypassDnd,
+                    onCheckedChange = { v -> viewModel.updateRule { it.copy(bypassDnd = v) } },
                 )
                 SwitchRow(
-                    title = "Case sensitive",
-                    checked = rule.caseSensitive,
-                    onCheckedChange = { v -> viewModel.updateRule { it.copy(caseSensitive = v) } },
+                    title = stringResource(R.string.hide_lock_screen),
+                    subtitle = stringResource(R.string.hide_lock_screen_body),
+                    checked = rule.hideContentOnLockScreen,
+                    onCheckedChange = { v ->
+                        viewModel.updateRule { it.copy(hideContentOnLockScreen = v) }
+                    },
+                )
+                SwitchRow(
+                    title = stringResource(R.string.stop_after),
+                    subtitle = stringResource(R.string.stop_after_body),
+                    checked = rule.stopOnMatch,
+                    onCheckedChange = { v -> viewModel.updateRule { it.copy(stopOnMatch = v) } },
                 )
             }
 
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
-            // ------------------------------------------------------ THEN
-            SectionHeader("Alert with")
-
-            RowItem(
-                icon = Icons.Default.MusicNote,
-                title = "Notification sound",
-                subtitle = rule.soundLabel,
-                onClick = {
-                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Sound for this rule")
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                        putExtra(
-                            RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                            rule.soundUri?.let(Uri::parse),
-                        )
-                        putExtra(
-                            RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
-                            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                        )
-                    }
-                    ringtonePicker.launch(intent)
-                },
-            )
-
-            Text(
-                "Vibration",
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 4.dp),
-            )
-            ChipRow(
-                options = VibrationPattern.entries.map { it to it.label },
-                selected = rule.vibration,
-                onSelect = { pattern ->
-                    viewModel.updateRule { it.copy(vibration = pattern) }
-                    viewModel.previewVibration(pattern)
-                },
-            )
-            Text(
-                "Tap a pattern to feel it",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp),
-            )
-
-            Text(
-                "Urgency",
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
-            )
-            ChipRow(
-                options = RuleImportance.entries.map { it to it.label },
-                selected = rule.importance,
-                onSelect = { imp -> viewModel.updateRule { it.copy(importance = imp) } },
-            )
-
-            Text(
-                "Accent colour",
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
-            )
-            ColorPicker(
-                selected = rule.accentColor,
-                onSelect = { color -> viewModel.updateRule { it.copy(accentColor = color) } },
-            )
-
-            OutlinedTextField(
-                value = rule.titlePrefix,
-                onValueChange = { v -> viewModel.updateRule { it.copy(titlePrefix = v) } },
-                label = { Text("Title badge (optional)") },
-                placeholder = { Text("e.g. 🔴 or ⭐") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-            )
-
-            SwitchRow(
-                title = "Bypass Do Not Disturb",
-                subtitle = "Alert even while DND is on",
-                checked = rule.bypassDnd,
-                onCheckedChange = { v -> viewModel.updateRule { it.copy(bypassDnd = v) } },
-            )
-            SwitchRow(
-                title = "Hide text on lock screen",
-                subtitle = "Show only the sender for messages matched by this rule",
-                checked = rule.hideContentOnLockScreen,
-                onCheckedChange = { v ->
-                    viewModel.updateRule { it.copy(hideContentOnLockScreen = v) }
-                },
-            )
-            SwitchRow(
-                title = "Stop after this rule",
-                subtitle = "Don't check later rules once this one matches",
-                checked = rule.stopOnMatch,
-                onCheckedChange = { v -> viewModel.updateRule { it.copy(stopOnMatch = v) } },
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
-            // ------------------------------------------------------ TEST
-            SectionHeader("Try it out")
-            Text(
-                "Enter a sample message to check whether this rule would fire.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            OutlinedTextField(
-                value = state.testSender,
-                onValueChange = viewModel::onTestSenderChange,
-                label = { Text("From (phone number)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-            )
-            OutlinedTextField(
-                value = state.testBody,
-                onValueChange = viewModel::onTestBodyChange,
-                label = { Text("Message text") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            // ---------------------------------------------------------- TEST
+            SectionCard(
+                title = stringResource(R.string.section_test),
+                icon = Icons.Default.Science,
             ) {
-                OutlinedButton(onClick = viewModel::runTest) {
-                    Icon(Icons.Default.Science, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Test rule")
+                Text(
+                    stringResource(R.string.test_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.testSender,
+                    onValueChange = viewModel::onTestSenderChange,
+                    label = { Text(stringResource(R.string.test_from)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = state.testBody,
+                    onValueChange = viewModel::onTestBodyChange,
+                    label = { Text(stringResource(R.string.test_body)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = viewModel::runTest) {
+                        Icon(Icons.Default.Science, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.test_rule))
+                    }
+                    OutlinedButton(onClick = { viewModel.previewVibration(rule.vibration) }) {
+                        Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.feel_vibration))
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
-                OutlinedButton(onClick = { viewModel.previewVibration(rule.vibration) }) {
-                    Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Feel vibration")
-                }
-            }
-            state.testResult?.let { result ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (result.matched) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                    ),
-                ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (result.matched) Icons.Default.Check else Icons.Default.Vibration,
-                            null,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(result.explanation, style = MaterialTheme.typography.bodyMedium)
+                state.testMatch?.let { outcome ->
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (outcome.matched) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (outcome.matched) Icons.Default.Check else Icons.Default.Science,
+                                null,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = outcome.match?.let {
+                                    stringResource(R.string.rule_would_fire, formatter.explain(it))
+                                } ?: stringResource(R.string.rule_would_not_fire),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             }
@@ -381,15 +412,57 @@ fun RuleEditorScreen(
     }
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** A titled card grouping one half of the rule. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SectionCard(
+    title: String,
+    icon: ImageVector,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 6.dp),
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> ChipRow(
     options: List<Pair<T, String>>,
     selected: T,
     onSelect: (T) -> Unit,
 ) {
-    androidx.compose.foundation.layout.FlowRow(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { (value, label) ->
@@ -402,12 +475,10 @@ private fun <T> ChipRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorPicker(selected: Int?, onSelect: (Int?) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         AvatarColors.forEach { color ->
             val argb = color.toArgb()
             Box(
@@ -419,7 +490,7 @@ private fun ColorPicker(selected: Int?, onSelect: (Int?) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected == argb) {
-                    Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Check, null, Modifier.size(20.dp), tint = Color.White)
                 }
             }
         }
@@ -437,7 +508,7 @@ private fun SwitchRow(
         Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -450,48 +521,37 @@ private fun SwitchRow(
                 )
             }
         }
+        Spacer(Modifier.width(12.dp))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun RowItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(20.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
-}
-
-private fun SenderMatch.label(): String = when (this) {
-    SenderMatch.ANY -> "Anyone"
-    SenderMatch.NUMBERS -> "Specific numbers"
-    SenderMatch.IN_CONTACTS -> "In my contacts"
-    SenderMatch.NOT_IN_CONTACTS -> "Unknown number"
-}
-
-private fun ContentMatch.label(): String = when (this) {
-    ContentMatch.ANY -> "Any text"
-    ContentMatch.CONTAINS_ANY -> "Contains any keyword"
-    ContentMatch.CONTAINS_ALL -> "Contains all keywords"
-    ContentMatch.STARTS_WITH -> "Starts with"
-    ContentMatch.REGEX -> "Matches regex"
 }

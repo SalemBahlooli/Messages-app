@@ -1,7 +1,9 @@
 package com.claude.messages.data.db
 
+import androidx.annotation.StringRes
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.claude.messages.R
 
 /** How a rule decides whether the *sender* matches. */
 enum class SenderMatch {
@@ -37,14 +39,14 @@ enum class ContentMatch {
 }
 
 /** Vibration presets offered in the rule editor. */
-enum class VibrationPattern(val label: String, val timings: LongArray?) {
-    DEFAULT("Default", null),
-    NONE("None", longArrayOf(0)),
-    SHORT("Short", longArrayOf(0, 120)),
-    DOUBLE("Double tap", longArrayOf(0, 100, 120, 100)),
-    LONG("Long", longArrayOf(0, 600)),
-    HEARTBEAT("Heartbeat", longArrayOf(0, 120, 90, 120, 400, 120, 90, 120)),
-    SOS("S.O.S.", longArrayOf(0, 100, 80, 100, 80, 100, 200, 300, 100, 300, 100, 300, 200, 100, 80, 100, 80, 100)),
+enum class VibrationPattern(@StringRes val labelRes: Int, val timings: LongArray?) {
+    DEFAULT(R.string.vib_default, null),
+    NONE(R.string.vib_none, longArrayOf(0)),
+    SHORT(R.string.vib_short, longArrayOf(0, 120)),
+    DOUBLE(R.string.vib_double, longArrayOf(0, 100, 120, 100)),
+    LONG(R.string.vib_long, longArrayOf(0, 600)),
+    HEARTBEAT(R.string.vib_heartbeat, longArrayOf(0, 120, 90, 120, 400, 120, 90, 120)),
+    SOS(R.string.vib_sos, longArrayOf(0, 100, 80, 100, 80, 100, 200, 300, 100, 300, 100, 300, 200, 100, 80, 100, 80, 100)),
     ;
 
     companion object {
@@ -54,11 +56,11 @@ enum class VibrationPattern(val label: String, val timings: LongArray?) {
 }
 
 /** Notification prominence a rule can force. */
-enum class RuleImportance(val label: String) {
-    SILENT("Silent — no sound, no banner"),
-    LOW("Quiet — status bar only"),
-    NORMAL("Normal"),
-    HIGH("Urgent — pop on screen"),
+enum class RuleImportance(@StringRes val labelRes: Int, @StringRes val shortLabelRes: Int) {
+    SILENT(R.string.importance_silent_long, R.string.importance_silent),
+    LOW(R.string.importance_low_long, R.string.importance_low),
+    NORMAL(R.string.importance_normal_long, R.string.importance_normal),
+    HIGH(R.string.importance_high_long, R.string.importance_high),
 }
 
 /**

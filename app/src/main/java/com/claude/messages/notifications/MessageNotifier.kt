@@ -50,7 +50,9 @@ class MessageNotifier(private val context: Context) {
         // ---- rule resolution -------------------------------------------------
         val rules = db.ruleDao().getEnabled()
         val forced = meta?.forcedRuleId?.let { id -> rules.firstOrNull { it.id == id } }
-        val matched = forced?.let { RuleMatch(it, "pinned to this conversation") }
+        val matched = forced?.let {
+            RuleMatch(it, MatchReason.Unconstrained, MatchReason.Unconstrained)
+        }
             ?: RuleEngine.match(
                 rules,
                 IncomingMessage(
@@ -214,8 +216,8 @@ class MessageNotifier(private val context: Context) {
         if (!hasPostPermission()) return
         val notification = NotificationCompat.Builder(context, ChannelManager.CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Message not sent")
-            .setContentText("Tap to retry sending to $recipient")
+            .setContentTitle(context.getString(R.string.message_not_sent))
+            .setContentText(context.getString(R.string.tap_to_retry, recipient))
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(

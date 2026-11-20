@@ -88,7 +88,7 @@ class ChannelManager(private val context: Context) {
         NotificationChannel(channelId, rule.name.ifBlank { "Rule ${rule.id}" }, rule.importance.toPlatform())
             .apply {
                 group = GROUP_RULES
-                description = RuleEngine.describe(rule)
+                description = RuleTextFormatter(context).describe(rule)
                 setShowBadge(true)
 
                 if (rule.importance == RuleImportance.SILENT) {

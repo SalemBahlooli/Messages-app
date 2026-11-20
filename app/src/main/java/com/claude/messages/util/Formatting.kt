@@ -1,6 +1,8 @@
 package com.claude.messages.util
 
+import android.content.Context
 import android.text.format.DateUtils
+import com.claude.messages.R
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -36,10 +38,15 @@ object Formatting {
     fun fullTimestamp(millis: Long): String =
         if (millis <= 0) "" else fullWithTime.format(Date(millis))
 
-    /** Day separator text shown between groups of messages in a thread. */
-    fun daySeparator(millis: Long): String = when {
-        DateUtils.isToday(millis) -> "Today"
-        DateUtils.isToday(millis + DateUtils.DAY_IN_MILLIS) -> "Yesterday"
+    /**
+     * Day separator text shown between groups of messages in a thread.
+     * Takes a Context so "Today" and "Yesterday" follow the phone's language.
+     */
+    fun daySeparator(context: Context, millis: Long): String = when {
+        DateUtils.isToday(millis) -> context.getString(R.string.today)
+        DateUtils.isToday(millis + DateUtils.DAY_IN_MILLIS) ->
+            context.getString(R.string.yesterday)
+
         else -> fullFormat.format(Date(millis))
     }
 

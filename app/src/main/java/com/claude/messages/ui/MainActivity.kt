@@ -8,17 +8,35 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.ui.conversations.ConversationsScreen
 import com.claude.messages.ui.conversations.ConversationsViewModel
+import com.claude.messages.ui.home.HomeNavigationBar
+import com.claude.messages.ui.home.HomeTab
 import com.claude.messages.ui.newmessage.NewMessageScreen
 import com.claude.messages.ui.newmessage.NewMessageViewModel
 import com.claude.messages.ui.rules.RuleEditorScreen
@@ -42,8 +60,7 @@ class MainActivity : ComponentActivity() {
     /**
      * Deep links arriving after the activity is created. The activity is
      * singleTask, so a notification tap while the app is already open reaches
-     * onNewIntent rather than re-running setContent — without this the tap
-     * would do nothing.
+     * onNewIntent rather than re-running setContent.
      */
     private val deepLinks = MutableSharedFlow<Destination>(extraBufferCapacity = 4)
 
@@ -65,6 +82,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MessagesTheme {
                 val navController = rememberNavController()
+                val backStackEntry by navController.currentBackStackEntryAsState()
+                val currentTab = HomeTab.ofRoute(backStackEntry?.destination?.route)
 
                 fun go(destination: Destination) = when (destination) {
                     is Destination.Thread ->
@@ -81,104 +100,155 @@ class MainActivity : ComponentActivity() {
                     deepLinks.collect(::go)
                 }
 
-                NavHost(navController = navController, startDestination = "conversations") {
-
-                    composable("conversations") {
-                        val vm: ConversationsViewModel = viewModel()
-                        // Pick up a role or permission granted while we were away.
-                        LaunchedEffect(Unit) { vm.refresh() }
-                        ConversationsScreen(
-                            viewModel = vm,
-                            onOpenThread = { navController.navigate("thread/$it") },
-                            onNewMessage = { navController.navigate("new") },
-                            onOpenRules = { navController.navigate("rules") },
-                            onOpenSettings = { navController.navigate("settings") },
-                            onRequestDefaultSms = ::requestDefaultSms,
-                            onGrantPermissions = ::requestMissingPermissions,
-                            onOpenAppSettings = ::openAppSettings,
-                            onOpenDefaultAppsSettings = ::openDefaultAppsSettings,
-                        )
-                    }
-
-                    composable(
-                        route = "thread/{threadId}",
-                        arguments = listOf(navArgument("threadId") { type = NavType.LongType }),
-                    ) { entry ->
-                        val threadId = entry.arguments?.getLong("threadId") ?: -1L
-                        val vm: ThreadViewModel = viewModel()
-                        LaunchedEffect(threadId) { vm.open(threadId) }
-                        ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
-                    }
-
-                    composable(
-                        route = "compose?address={address}&body={body}",
-                        arguments = listOf(
-                            navArgument("address") {
-                                type = NavType.StringType
-                                defaultValue = ""
-                            },
-                            navArgument("body") {
-                                type = NavType.StringType
-                                defaultValue = ""
-                            },
-                        ),
-                    ) { entry ->
-                        val address = entry.arguments?.getString("address").orEmpty()
-                        val body = entry.arguments?.getString("body").orEmpty()
-                        val vm: ThreadViewModel = viewModel()
-                        // Passing the address is what lets a brand-new conversation send.
-                        LaunchedEffect(address) { vm.open(-1L, address, body) }
-                        ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
-                    }
-
-                    composable("new") {
-                        val vm: NewMessageViewModel = viewModel()
-                        NewMessageScreen(
-                            viewModel = vm,
-                            onBack = { navController.popBackStack() },
-                            onCompose = { address ->
-                                navController.popBackStack()
-                                navController.navigate("compose?address=${Uri.encode(address)}&body=")
-                            },
-                        )
-                    }
-
-                    composable("rules") {
-                        val vm: RulesViewModel = viewModel()
-                        RulesListScreen(
-                            viewModel = vm,
-                            onBack = { navController.popBackStack() },
-                            onAddRule = {
-                                vm.startNew()
-                                navController.navigate("ruleEditor")
-                            },
-                            onEditRule = { id ->
-                                vm.startEdit(id)
-                                navController.navigate("ruleEditor")
-                            },
-                        )
-                    }
-
-                    composable("ruleEditor") { entry ->
-                        // Share the RulesViewModel with the list so the editor state
-                        // set by startNew()/startEdit() survives navigation.
-                        val parent = remember(entry) { navController.getBackStackEntry("rules") }
-                        val vm: RulesViewModel = viewModel(parent)
-                        RuleEditorScreen(
-                            viewModel = vm,
-                            onDone = { navController.popBackStack() },
-                        )
-                    }
-
-                    composable("settings") {
-                        SettingsScreen(
-                            onBack = { navController.popBackStack() },
-                            onOpenRules = { navController.navigate("rules") },
-                            onRequestDefaultSms = ::requestDefaultSms,
-                        )
-                    }
+                Scaffold(
+                    bottomBar = {
+                        // Slides away on full-screen destinations so a chat or
+                        // the rule editor gets the whole display.
+                        AnimatedVisibility(
+                            visible = currentTab != null,
+                            enter = slideInVertically { it },
+                            exit = slideOutVertically { it },
+                        ) {
+                            HomeNavigationBar(
+                                current = currentTab,
+                                onSelect = { tab -> navController.switchTab(tab) },
+                            )
+                        }
+                    },
+                ) { scaffoldPadding ->
+                    AppNavHost(
+                        navController = navController,
+                        // Only the bottom inset is consumed here; each screen
+                        // still draws its own top bar under the status bar.
+                        contentPadding = scaffoldPadding,
+                        onRequestDefaultSms = ::requestDefaultSms,
+                        onGrantPermissions = ::requestMissingPermissions,
+                        onOpenAppSettings = ::openAppSettings,
+                        onOpenDefaultAppsSettings = ::openDefaultAppsSettings,
+                        onOpenSystemNotifications = ::openSystemNotificationSettings,
+                    )
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun AppNavHost(
+        navController: NavHostController,
+        contentPadding: PaddingValues,
+        onRequestDefaultSms: () -> Unit,
+        onGrantPermissions: () -> Unit,
+        onOpenAppSettings: () -> Unit,
+        onOpenDefaultAppsSettings: () -> Unit,
+        onOpenSystemNotifications: () -> Unit,
+    ) {
+        val layoutDirection = LocalLayoutDirection.current
+        val tabPadding = remember(contentPadding, layoutDirection) {
+            PaddingValues(
+                start = contentPadding.calculateStartPadding(layoutDirection),
+                end = contentPadding.calculateEndPadding(layoutDirection),
+                bottom = contentPadding.calculateBottomPadding(),
+            )
+        }
+
+        Box(Modifier.fillMaxSize()) {
+            NavHost(navController = navController, startDestination = HomeTab.CHATS.route) {
+
+                composable(HomeTab.CHATS.route) {
+                    val vm: ConversationsViewModel = viewModel()
+                    ConversationsScreen(
+                        viewModel = vm,
+                        contentPadding = tabPadding,
+                        onOpenThread = { navController.navigate("thread/$it") },
+                        onNewMessage = { navController.navigate("new") },
+                        onRequestDefaultSms = onRequestDefaultSms,
+                        onGrantPermissions = onGrantPermissions,
+                        onOpenAppSettings = onOpenAppSettings,
+                        onOpenDefaultAppsSettings = onOpenDefaultAppsSettings,
+                    )
+                }
+
+                composable(HomeTab.RULES.route) {
+                    val vm: RulesViewModel = viewModel()
+                    RulesListScreen(
+                        viewModel = vm,
+                        contentPadding = tabPadding,
+                        onAddRule = {
+                            vm.startNew()
+                            navController.navigate("ruleEditor")
+                        },
+                        onEditRule = { id ->
+                            vm.startEdit(id)
+                            navController.navigate("ruleEditor")
+                        },
+                    )
+                }
+
+                composable(HomeTab.SETTINGS.route) {
+                    SettingsScreen(
+                        contentPadding = tabPadding,
+                        onOpenRules = { navController.switchTab(HomeTab.RULES) },
+                        onRequestDefaultSms = onRequestDefaultSms,
+                        onOpenSystemNotifications = onOpenSystemNotifications,
+                    )
+                }
+
+                composable(
+                    route = "thread/{threadId}",
+                    arguments = listOf(navArgument("threadId") { type = NavType.LongType }),
+                ) { entry ->
+                    val threadId = entry.arguments?.getLong("threadId") ?: -1L
+                    val vm: ThreadViewModel = viewModel()
+                    LaunchedEffect(threadId) { vm.open(threadId) }
+                    ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                }
+
+                composable(
+                    route = "compose?address={address}&body={body}",
+                    arguments = listOf(
+                        navArgument("address") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("body") { type = NavType.StringType; defaultValue = "" },
+                    ),
+                ) { entry ->
+                    val address = entry.arguments?.getString("address").orEmpty()
+                    val body = entry.arguments?.getString("body").orEmpty()
+                    val vm: ThreadViewModel = viewModel()
+                    // Passing the address is what lets a brand-new conversation send.
+                    LaunchedEffect(address) { vm.open(-1L, address, body) }
+                    ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                }
+
+                composable("new") {
+                    val vm: NewMessageViewModel = viewModel()
+                    NewMessageScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onCompose = { address ->
+                            navController.popBackStack()
+                            navController.navigate("compose?address=${Uri.encode(address)}&body=")
+                        },
+                    )
+                }
+
+                composable("ruleEditor") { entry ->
+                    // Shares the RulesViewModel with the list so the editor state
+                    // set by startNew()/startEdit() survives navigation.
+                    val parent = remember(entry) {
+                        navController.getBackStackEntry(HomeTab.RULES.route)
+                    }
+                    val vm: RulesViewModel = viewModel(parent)
+                    RuleEditorScreen(viewModel = vm, onDone = { navController.popBackStack() })
+                }
+            }
+        }
+    }
+
+    /** Switches tabs without stacking duplicates of the top-level screens. */
+    private fun NavHostController.switchTab(tab: HomeTab) {
+        navigate(tab.route) {
+            popUpTo(graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
         }
     }
 
@@ -204,6 +274,10 @@ class MainActivity : ComponentActivity() {
 
     private fun openDefaultAppsSettings() {
         runCatching { startActivity(DefaultSmsHelper.defaultAppsSettingsIntent()) }
+    }
+
+    private fun openSystemNotificationSettings() {
+        runCatching { startActivity(DefaultSmsHelper.notificationSettingsIntent(this)) }
     }
 
     private fun requestMissingPermissions() {

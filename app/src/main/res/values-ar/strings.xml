@@ -1,0 +1,238 @@
+<resources>
+    <string name="app_name">الرسائل</string>
+
+    <!-- Navigation -->
+    <string name="tab_chats">المحادثات</string>
+    <string name="tab_rules">القواعد</string>
+    <string name="tab_settings">الإعدادات</string>
+
+    <!-- Conversation list -->
+    <string name="search_messages">ابحث في الرسائل</string>
+    <string name="start_chat">محادثة جديدة</string>
+    <string name="archived">المؤرشفة</string>
+    <string name="pinned">مثبّتة</string>
+    <string name="all_messages">كل الرسائل</string>
+    <string name="no_conversations">لا توجد محادثات بعد</string>
+    <string name="no_conversations_hint">اضغط «محادثة جديدة» لإرسال أول رسالة.</string>
+    <string name="nothing_archived">لا يوجد شيء في الأرشيف</string>
+    <string name="no_matching_messages">لا توجد رسائل مطابقة</string>
+    <string name="no_messages">لا توجد رسائل</string>
+    <string name="no_recipient">بدون مستلم</string>
+    <plurals name="selected_count">
+        <item quantity="zero">لم يُحدَّد شيء</item>
+        <item quantity="one">محادثة واحدة محدّدة</item>
+        <item quantity="two">محادثتان محدّدتان</item>
+        <item quantity="few">%d محادثات محدّدة</item>
+        <item quantity="many">%d محادثة محدّدة</item>
+        <item quantity="other">%d محادثة محدّدة</item>
+    </plurals>
+    <string name="couldnt_read_messages">تعذّرت قراءة رسائلك</string>
+
+    <!-- Actions -->
+    <string name="pin">تثبيت</string>
+    <string name="unpin">إلغاء التثبيت</string>
+    <string name="mute">كتم</string>
+    <string name="unmute">إلغاء الكتم</string>
+    <string name="archive">أرشفة</string>
+    <string name="unarchive">إلغاء الأرشفة</string>
+    <string name="delete">حذف</string>
+    <string name="mark_read">تعليم كمقروء</string>
+    <string name="cancel">إلغاء</string>
+    <string name="done">تم</string>
+    <string name="save">حفظ</string>
+    <string name="copy">نسخ</string>
+    <string name="retry">إعادة المحاولة</string>
+    <string name="back">رجوع</string>
+    <string name="more">المزيد</string>
+    <string name="clear">مسح</string>
+    <string name="dismiss">إخفاء</string>
+    <string name="send">إرسال</string>
+    <string name="reply">رد</string>
+
+    <!-- Thread -->
+    <string name="text_message">اكتب رسالة</string>
+    <string name="new_message">رسالة جديدة</string>
+    <string name="to">إلى</string>
+    <string name="name_or_number">اسم أو رقم جوال</string>
+    <string name="send_to">أرسل إلى %s</string>
+    <string name="no_contacts_found">لا توجد جهات اتصال</string>
+    <string name="no_contacts_hint">اكتب رقم جوال لبدء محادثة جديدة.</string>
+    <string name="today">اليوم</string>
+    <string name="yesterday">أمس</string>
+    <string name="sending">جاري الإرسال</string>
+    <string name="sent">أُرسلت</string>
+    <string name="delivered">وصلت</string>
+    <string name="not_sent">لم تُرسل</string>
+    <string name="muted">مكتومة</string>
+    <string name="delete_conversation">حذف المحادثة</string>
+    <string name="mute_notifications">كتم الإشعارات</string>
+    <string name="message_label">الرسالة</string>
+    <string name="sms_segments">%1$d رسائل · بقي %2$d حرف في هذه</string>
+    <string name="sms_chars_left">بقي %d حرف</string>
+
+    <!-- Setup -->
+    <string name="setup_permissions_title">اسمح بالوصول إلى رسائلك</string>
+    <string name="setup_permissions_body">مطلوب لعرض محادثاتك.</string>
+    <string name="setup_default_title">اجعل «الرسائل» تطبيقك الافتراضي</string>
+    <string name="setup_default_body">مطلوب لإرسال الرسائل وحفظها.</string>
+    <string name="setup_continue">متابعة</string>
+    <string name="set_as_default">اجعله افتراضياً</string>
+    <string name="didnt_work">لم ينجح؟</string>
+    <string name="restricted_title">إذا رُفض جعله افتراضياً</string>
+    <string name="restricted_body">أندرويد يمنع التطبيقات المثبّتة من ملف APK — بدل المتجر — من أخذ أدوار حسّاسة مثل تطبيق الرسائل. هذا ليس خطأً في التطبيق، وتقدر تسمح به يدوياً.</string>
+    <string name="restricted_step_1">افتح صفحة التطبيق في إعدادات النظام.</string>
+    <string name="restricted_step_2">اضغط قائمة ⋮ أعلى اليمين.</string>
+    <string name="restricted_step_3">اختر «السماح بالإعدادات المقيّدة».</string>
+    <string name="restricted_step_4">ارجع واضغط «اجعله افتراضياً» مرة أخرى.</string>
+    <string name="restricted_note">خيار القائمة يظهر فقط بعد أن يُرفض التطبيق مرة واحدة.</string>
+    <string name="open_app_settings">افتح إعدادات التطبيق</string>
+    <string name="open_default_apps">افتح قائمة التطبيقات الافتراضية</string>
+    <string name="default_apps_hint">الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← تطبيق الرسائل، تنفع أيضاً في أغلب الأجهزة.</string>
+
+    <!-- Rules -->
+    <string name="notification_rules">قواعد الإشعارات</string>
+    <string name="rules_subtitle">أعطِ جهة اتصال أو كلمة نغمتها الخاصة</string>
+    <string name="new_rule">قاعدة جديدة</string>
+    <string name="edit_rule">تعديل القاعدة</string>
+    <string name="no_rules_title">لا توجد قواعد بعد</string>
+    <string name="no_rules_body">أنشئ قاعدة لتعطي جهة اتصال معيّنة — أو الرسائل التي تحتوي كلمات محدّدة — نغمة واهتزازاً وأهمية خاصة بها.</string>
+    <string name="create_rule">أنشئ قاعدة</string>
+    <string name="rules_order_hint">تُفحص من الأعلى للأسفل، وأول قاعدة مطابقة هي التي تُطبَّق.</string>
+    <string name="rule_name">اسم القاعدة</string>
+    <string name="rule_name_hint">مثال: العائلة، تنبيهات العمل، رموز البنك</string>
+    <string name="move_up">تحريك لأعلى</string>
+    <string name="move_down">تحريك لأسفل</string>
+    <string name="delete_rule">حذف القاعدة</string>
+
+    <string name="section_when">متى</string>
+    <string name="section_then">نبّهني هكذا</string>
+    <string name="section_test">جرّبها</string>
+    <string name="from_sender">من</string>
+    <string name="and_message">ومحتوى الرسالة</string>
+
+    <string name="sender_any">أي شخص</string>
+    <string name="sender_numbers">أرقام محدّدة</string>
+    <string name="sender_in_contacts">من جهات اتصالي</string>
+    <string name="sender_unknown">رقم غير معروف</string>
+    <string name="content_any">أي نص</string>
+    <string name="content_contains_any">يحتوي أي كلمة</string>
+    <string name="content_contains_all">يحتوي كل الكلمات</string>
+    <string name="content_starts_with">يبدأ بـ</string>
+    <string name="content_regex">يطابق تعبيراً نمطياً</string>
+
+    <string name="phone_numbers">أرقام الجوال</string>
+    <string name="phone_numbers_hint">افصل بين الأرقام بفاصلة</string>
+    <string name="tap_contact_hint">اضغط على جهة اتصال لإضافة رقمها</string>
+    <string name="keywords">الكلمات المفتاحية</string>
+    <string name="keywords_hint">كلمة واحدة في كل سطر</string>
+    <string name="regex_label">تعبير نمطي</string>
+    <string name="regex_hint">مثال: \\b\\d{4,8}\\b لمطابقة رمز رقمي</string>
+    <string name="case_sensitive">حساس لحالة الأحرف</string>
+
+    <string name="notification_sound">نغمة الإشعار</string>
+    <string name="sound_for_rule">نغمة هذه القاعدة</string>
+    <string name="vibration">الاهتزاز</string>
+    <string name="vibration_hint">اضغط على النمط لتجربته</string>
+    <string name="urgency">الأهمية</string>
+    <string name="accent_colour">اللون المميّز</string>
+    <string name="title_badge">شارة العنوان (اختياري)</string>
+    <string name="title_badge_hint">مثال: 🔴 أو ⭐</string>
+    <string name="bypass_dnd">تجاوز وضع عدم الإزعاج</string>
+    <string name="bypass_dnd_body">نبّهني حتى أثناء تفعيل عدم الإزعاج</string>
+    <string name="hide_lock_screen">إخفاء النص في شاشة القفل</string>
+    <string name="hide_lock_screen_body">اعرض المرسِل فقط للرسائل المطابقة لهذه القاعدة</string>
+    <string name="stop_after">توقّف عند هذه القاعدة</string>
+    <string name="stop_after_body">لا تفحص القواعد التالية بعد مطابقتها</string>
+
+    <string name="test_hint">اكتب رسالة تجريبية لتتأكد هل ستُطبَّق هذه القاعدة.</string>
+    <string name="test_from">من (رقم الجوال)</string>
+    <string name="test_body">نص الرسالة</string>
+    <string name="test_rule">اختبر القاعدة</string>
+    <string name="feel_vibration">جرّب الاهتزاز</string>
+    <string name="rule_would_fire">ستُطبَّق هذه القاعدة: %s.</string>
+    <string name="rule_would_not_fire">لن تُطبَّق هذه القاعدة على تلك الرسالة.</string>
+
+    <string name="rule_for_chat">قاعدة الإشعار</string>
+    <string name="rule_for_chat_hint">ثبّت قاعدة على هذه المحادثة، أو اترك الشروط تقرّر.</string>
+    <string name="rule_automatic">تلقائي</string>
+    <string name="rule_automatic_hint">المطابقة حسب الشروط</string>
+    <string name="no_rules_inline">لا توجد قواعد بعد — أنشئ واحدة من تبويب «القواعد».</string>
+
+    <string name="importance_silent">صامت</string>
+    <string name="importance_low">هادئ</string>
+    <string name="importance_normal">عادي</string>
+    <string name="importance_high">عاجل</string>
+    <string name="importance_silent_long">صامت — بلا صوت ولا لافتة</string>
+    <string name="importance_low_long">هادئ — في شريط الحالة فقط</string>
+    <string name="importance_normal_long">عادي</string>
+    <string name="importance_high_long">عاجل — يظهر على الشاشة</string>
+
+    <string name="vib_default">افتراضي</string>
+    <string name="vib_none">بدون</string>
+    <string name="vib_short">قصير</string>
+    <string name="vib_double">نقرتان</string>
+    <string name="vib_long">طويل</string>
+    <string name="vib_heartbeat">نبضات قلب</string>
+    <string name="vib_sos">استغاثة</string>
+
+    <!-- Settings -->
+    <string name="settings_notifications">الإشعارات</string>
+    <string name="settings_sms">الرسائل</string>
+    <string name="settings_diagnostics">التشخيص</string>
+    <string name="settings_about">حول</string>
+    <string name="system_notification_settings">إعدادات إشعارات النظام</string>
+    <string name="system_notification_body">مستوى الصوت والشارات ووضع عدم الإزعاج</string>
+    <string name="default_sms_app">تطبيق الرسائل الافتراضي</string>
+    <string name="is_default_yes">«الرسائل» هو تطبيقك الافتراضي</string>
+    <string name="is_default_no">اضغط لجعل «الرسائل» افتراضياً</string>
+    <string name="about_body">تطبيق رسائل كامل مع قواعد إشعارات حسب المرسِل أو الكلمات</string>
+    <string name="diag_default">التطبيق الافتراضي للرسائل</string>
+    <string name="diag_can_send">الإرسال ممكن الآن</string>
+    <string name="diag_radio">شبكة خلوية</string>
+    <string name="diag_read">قراءة الرسائل</string>
+    <string name="diag_send">إرسال الرسائل</string>
+    <string name="diag_receive">استقبال الرسائل</string>
+    <string name="diag_contacts">جهات الاتصال</string>
+    <string name="diag_notifications">الإشعارات</string>
+    <string name="diag_sim">حالة الشريحة</string>
+    <string name="diag_system_sms">تطبيق الرسائل لدى النظام</string>
+    <string name="diag_this_app">هذا التطبيق</string>
+    <string name="diag_android">أندرويد</string>
+    <string name="diag_device">الجهاز</string>
+    <string name="yes">نعم</string>
+    <string name="no">لا</string>
+    <string name="none">لا يوجد</string>
+
+    <!-- Notifications -->
+    <string name="channel_messages">الرسائل</string>
+    <string name="mark_as_read">تعليم كمقروء</string>
+    <string name="message_not_sent">لم تُرسل الرسالة</string>
+    <string name="tap_to_retry">اضغط لإعادة الإرسال إلى %s</string>
+    <!-- Rule reasons -->
+    <string name="reason_join"> و</string>
+    <string name="reason_sender_is">المرسِل هو %s</string>
+    <string name="reason_sender_saved">المرسِل من جهات اتصالك</string>
+    <string name="reason_sender_unknown">المرسِل غير محفوظ في جهات الاتصال</string>
+    <string name="reason_contains">الرسالة تحتوي \"%s\"</string>
+    <string name="reason_contains_all">الرسالة تحتوي كل الكلمات: %s</string>
+    <string name="reason_starts_with">الرسالة تبدأ بـ \"%s\"</string>
+    <string name="reason_regex">الرسالة تطابق %s</string>
+    <string name="problem_no_name">أعطِ القاعدة اسماً</string>
+    <string name="problem_no_numbers">أضف رقم جوال واحداً على الأقل</string>
+    <string name="problem_no_keywords">أضف كلمة مفتاحية واحدة على الأقل</string>
+    <string name="problem_bad_regex">التعبير النمطي غير صالح</string>
+    <string name="problem_matches_everything">قاعدة تطابق كل شيء ستلغي بقية القواعد — أضف شرطاً</string>
+    <!-- Errors -->
+    <string name="err_no_recipient">لا يوجد مستلم لهذه المحادثة</string>
+    <string name="err_message_empty">الرسالة فارغة</string>
+    <string name="err_not_saved">أُرسلت، لكن لم تُحفظ في محادثاتك — «الرسائل» ليس تطبيقك الافتراضي.</string>
+    <string name="err_security">أندرويد منع الإرسال. تأكد من منح «الرسائل» صلاحية الرسائل.</string>
+    <string name="err_blocked_detail">أندرويد منع الإرسال: %s</string>
+    <string name="err_rejected">رفض النظام الرسالة.</string>
+    <string name="err_couldnt_send">تعذّر الإرسال: %s</string>
+    <string name="err_sms_unavailable">خدمة الرسائل غير متاحة على هذا الجهاز</string>
+    <string name="block_no_permission">«الرسائل» لا يملك صلاحية إرسال الرسائل. امنحها من إعدادات التطبيق.</string>
+    <string name="block_no_telephony">هذا الجهاز بلا شبكة خلوية، فلا يمكنه إرسال الرسائل.</string>
+    <string name="block_no_sim">لا توجد شريحة اتصال. أدخل شريحة لإرسال الرسائل.</string>
+    <string name="block_sim_locked">شريحتك مقفلة. افتح قفلها لإرسال الرسائل.</string>
+</resources>

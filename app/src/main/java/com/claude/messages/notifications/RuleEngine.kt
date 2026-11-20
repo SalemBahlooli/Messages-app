@@ -13,80 +13,108 @@ data class IncomingMessage(
     val senderIsKnownContact: Boolean = false,
 )
 
-/** The rule that won, plus why — the "why" is surfaced in the rule tester UI. */
+/**
+ * Why a rule applied, as data rather than prose.
+ *
+ * The engine deliberately produces no user-facing text: the same reason has to
+ * render in whatever language the phone is set to, so formatting belongs in the
+ * presentation layer (see RuleTextFormatter).
+ */
+sealed interface MatchReason {
+    /** The condition was "anyone" / "any text" — it constrains nothing. */
+    data object Unconstrained : MatchReason
+
+    data class SenderNumber(val number: String) : MatchReason
+    data object SenderInContacts : MatchReason
+    data object SenderUnknown : MatchReason
+
+    data class ContainsKeyword(val keyword: String) : MatchReason
+    data class ContainsAll(val keywords: List<String>) : MatchReason
+    data class StartsWith(val keyword: String) : MatchReason
+    data class MatchesRegex(val pattern: String) : MatchReason
+}
+
+/** The rule that won, and the conditions that made it win. */
 data class RuleMatch(
     val rule: NotificationRule,
-    val reason: String,
+    val senderReason: MatchReason,
+    val contentReason: MatchReason,
 )
 
+/** Reasons a rule cannot be saved. The UI turns these into sentences. */
+enum class RuleProblem {
+    NO_NAME,
+    NO_NUMBERS,
+    NO_KEYWORDS,
+    BAD_REGEX,
+    MATCHES_EVERYTHING,
+}
+
 /**
- * Pure matching logic for [NotificationRule]s. Deliberately free of Android
- * dependencies so the whole decision table can be unit-tested.
+ * Pure matching logic for [NotificationRule]s. Free of Android dependencies so
+ * the whole decision table can be unit-tested.
  */
 object RuleEngine {
 
     /**
      * Returns the first enabled rule that matches, honouring [NotificationRule.order].
-     * Rules with `stopOnMatch = false` are skipped over as "annotations": they
-     * match but let a later, more specific rule take over if one exists.
+     * Rules with `stopOnMatch = false` match but let a later, more specific rule
+     * take over if one exists.
      */
     fun match(rules: List<NotificationRule>, message: IncomingMessage): RuleMatch? {
         var softMatch: RuleMatch? = null
         for (rule in rules.sortedWith(compareBy({ it.order }, { it.id }))) {
             if (!rule.enabled) continue
-            val reason = evaluate(rule, message) ?: continue
-            val hit = RuleMatch(rule, reason)
+            val hit = evaluate(rule, message) ?: continue
             if (rule.stopOnMatch) return hit
             if (softMatch == null) softMatch = hit
         }
         return softMatch
     }
 
-    /** Returns a human-readable reason when [rule] applies to [message], else null. */
-    fun evaluate(rule: NotificationRule, message: IncomingMessage): String? {
-        val senderReason = matchSender(rule, message) ?: return null
-        val contentReason = matchContent(rule, message) ?: return null
-        return listOf(senderReason, contentReason)
-            .filter { it.isNotEmpty() }
-            .joinToString(" and ")
-            .ifEmpty { "matches every message" }
+    /** The match for [rule] against [message], or null when it doesn't apply. */
+    fun evaluate(rule: NotificationRule, message: IncomingMessage): RuleMatch? {
+        val sender = matchSender(rule, message) ?: return null
+        val content = matchContent(rule, message) ?: return null
+        return RuleMatch(rule, sender, content)
     }
 
-    private fun matchSender(rule: NotificationRule, message: IncomingMessage): String? =
+    private fun matchSender(rule: NotificationRule, message: IncomingMessage): MatchReason? =
         when (rule.senderMatch) {
-            SenderMatch.ANY -> ""
+            SenderMatch.ANY -> MatchReason.Unconstrained
+
             SenderMatch.NUMBERS -> rule.senderNumbers
                 .firstOrNull { PhoneNumbers.sameNumber(it, message.address) }
-                ?.let { "sender is $it" }
+                ?.let(MatchReason::SenderNumber)
 
             SenderMatch.IN_CONTACTS ->
-                if (message.senderIsKnownContact) "sender is a saved contact" else null
+                if (message.senderIsKnownContact) MatchReason.SenderInContacts else null
 
             SenderMatch.NOT_IN_CONTACTS ->
-                if (!message.senderIsKnownContact) "sender is not in contacts" else null
+                if (!message.senderIsKnownContact) MatchReason.SenderUnknown else null
         }
 
-    private fun matchContent(rule: NotificationRule, message: IncomingMessage): String? {
+    private fun matchContent(rule: NotificationRule, message: IncomingMessage): MatchReason? {
         val body = if (rule.caseSensitive) message.body else message.body.lowercase()
         fun norm(s: String) = if (rule.caseSensitive) s else s.lowercase()
 
         return when (rule.contentMatch) {
-            ContentMatch.ANY -> ""
+            ContentMatch.ANY -> MatchReason.Unconstrained
 
             ContentMatch.CONTAINS_ANY -> rule.keywords
                 .firstOrNull { body.contains(norm(it)) }
-                ?.let { "message contains \"$it\"" }
+                ?.let(MatchReason::ContainsKeyword)
 
             ContentMatch.CONTAINS_ALL -> {
                 val keywords = rule.keywords
                 if (keywords.isNotEmpty() && keywords.all { body.contains(norm(it)) }) {
-                    "message contains all of ${keywords.joinToString(", ")}"
+                    MatchReason.ContainsAll(keywords)
                 } else null
             }
 
             ContentMatch.STARTS_WITH -> rule.keywords.firstOrNull()
                 ?.takeIf { body.startsWith(norm(it)) }
-                ?.let { "message starts with \"$it\"" }
+                ?.let(MatchReason::StartsWith)
 
             ContentMatch.REGEX -> {
                 val pattern = rule.contentValues.trim()
@@ -94,46 +122,27 @@ object RuleEngine {
                 val options = if (rule.caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
                 runCatching { Regex(pattern, options) }.getOrNull()
                     ?.takeIf { it.containsMatchIn(message.body) }
-                    ?.let { "message matches /$pattern/" }
+                    ?.let { MatchReason.MatchesRegex(pattern) }
             }
         }
     }
 
-    /** Validates a rule before saving; returns an error message or null when valid. */
-    fun validate(rule: NotificationRule): String? = when {
-        rule.name.isBlank() -> "Give the rule a name"
+    /** Checks a rule before saving; returns the problem or null when valid. */
+    fun validate(rule: NotificationRule): RuleProblem? = when {
+        rule.name.isBlank() -> RuleProblem.NO_NAME
 
         rule.senderMatch == SenderMatch.NUMBERS && rule.senderNumbers.isEmpty() ->
-            "Add at least one phone number"
+            RuleProblem.NO_NUMBERS
 
         rule.contentMatch != ContentMatch.ANY && rule.contentMatch != ContentMatch.REGEX &&
-            rule.keywords.isEmpty() -> "Add at least one keyword"
+            rule.keywords.isEmpty() -> RuleProblem.NO_KEYWORDS
 
         rule.contentMatch == ContentMatch.REGEX &&
-            runCatching { Regex(rule.contentValues.trim()) }.isFailure ->
-            "That regular expression is not valid"
+            runCatching { Regex(rule.contentValues.trim()) }.isFailure -> RuleProblem.BAD_REGEX
 
         rule.senderMatch == SenderMatch.ANY && rule.contentMatch == ContentMatch.ANY ->
-            "A rule that matches everything would override all others — add a condition"
+            RuleProblem.MATCHES_EVERYTHING
 
         else -> null
-    }
-
-    /** One-line summary of a rule's conditions, shown in the rules list. */
-    fun describe(rule: NotificationRule): String {
-        val sender = when (rule.senderMatch) {
-            SenderMatch.ANY -> "Any sender"
-            SenderMatch.NUMBERS -> rule.senderNumbers.joinToString(", ").ifEmpty { "No numbers yet" }
-            SenderMatch.IN_CONTACTS -> "Saved contacts"
-            SenderMatch.NOT_IN_CONTACTS -> "Unknown numbers"
-        }
-        val content = when (rule.contentMatch) {
-            ContentMatch.ANY -> null
-            ContentMatch.CONTAINS_ANY -> "contains any of ${rule.keywords.joinToString(", ")}"
-            ContentMatch.CONTAINS_ALL -> "contains all of ${rule.keywords.joinToString(", ")}"
-            ContentMatch.STARTS_WITH -> "starts with ${rule.keywords.firstOrNull().orEmpty()}"
-            ContentMatch.REGEX -> "matches /${rule.contentValues.trim()}/"
-        }
-        return listOfNotNull(sender, content).joinToString(" · ")
     }
 }

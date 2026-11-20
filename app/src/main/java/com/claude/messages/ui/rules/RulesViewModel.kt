@@ -13,6 +13,8 @@ import com.claude.messages.notifications.ChannelManager
 import com.claude.messages.notifications.IncomingMessage
 import com.claude.messages.notifications.MessageNotifier
 import com.claude.messages.notifications.RuleEngine
+import com.claude.messages.notifications.RuleMatch
+import com.claude.messages.notifications.RuleProblem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,19 +23,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Result of running the rule tester in the editor. */
-data class RuleTestResult(
+/**
+ * Result of running the rule tester. Holds the engine's structured match so the
+ * screen can render the explanation in the phone's language.
+ */
+data class RuleTestOutcome(
     val matched: Boolean,
-    val explanation: String,
+    val match: RuleMatch?,
 )
 
 data class RuleEditorState(
     val rule: NotificationRule = NotificationRule(),
     val isNew: Boolean = true,
-    val error: String? = null,
+    val problem: RuleProblem? = null,
     val testSender: String = "",
     val testBody: String = "",
-    val testResult: RuleTestResult? = null,
+    val testMatch: RuleTestOutcome? = null,
     val contacts: List<Contact> = emptyList(),
     val saved: Boolean = false,
 )
@@ -104,7 +109,7 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateRule(transform: (NotificationRule) -> NotificationRule) {
-        _editor.update { it.copy(rule = transform(it.rule), error = null, testResult = null) }
+        _editor.update { it.copy(rule = transform(it.rule), problem = null, testMatch = null) }
     }
 
     fun setSound(uri: Uri?) {
@@ -119,10 +124,10 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
     fun previewVibration(pattern: VibrationPattern) = notifier.previewVibration(pattern)
 
     fun onTestSenderChange(value: String) =
-        _editor.update { it.copy(testSender = value, testResult = null) }
+        _editor.update { it.copy(testSender = value, testMatch = null) }
 
     fun onTestBodyChange(value: String) =
-        _editor.update { it.copy(testBody = value, testResult = null) }
+        _editor.update { it.copy(testBody = value, testMatch = null) }
 
     /**
      * Runs the rule under construction against the sample message so the user
@@ -133,7 +138,7 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
             val state = _editor.value
             val known = state.testSender.isNotBlank() &&
                 contactsRepo.lookup(state.testSender) != null
-            val reason = RuleEngine.evaluate(
+            val match = RuleEngine.evaluate(
                 state.rule,
                 IncomingMessage(
                     address = state.testSender,
@@ -142,22 +147,16 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
                 ),
             )
             _editor.update {
-                it.copy(
-                    testResult = if (reason != null) {
-                        RuleTestResult(true, "This rule would fire: $reason.")
-                    } else {
-                        RuleTestResult(false, "This rule would not fire for that message.")
-                    },
-                )
+                it.copy(testMatch = RuleTestOutcome(matched = match != null, match = match))
             }
         }
     }
 
     fun save() {
         val rule = _editor.value.rule
-        val error = RuleEngine.validate(rule)
-        if (error != null) {
-            _editor.update { it.copy(error = error) }
+        val problem = RuleEngine.validate(rule)
+        if (problem != null) {
+            _editor.update { it.copy(problem = problem) }
             return
         }
         viewModelScope.launch {
@@ -174,6 +173,4 @@ class RulesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun consumeSaved() = _editor.update { it.copy(saved = false) }
-
-    fun describe(rule: NotificationRule): String = RuleEngine.describe(rule)
 }
