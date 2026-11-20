@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,8 +90,15 @@ fun ThreadScreen(
     var ruleDialogOpen by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf<Message?>(null) }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+    // The list uses reverseLayout, so item 0 is the newest message and the
+    // conversation opens already pinned to the bottom — no scroll from the top.
+    // Only when a new message arrives (and the user is near the bottom) do we
+    // glide down to it.
+    val newestId = state.messages.lastOrNull()?.id
+    LaunchedEffect(newestId) {
+        if (newestId != null && listState.firstVisibleItemIndex <= 1) {
+            listState.animateScrollToItem(0)
+        }
     }
 
     // Surface send failures instead of failing silently.
@@ -134,33 +140,40 @@ fun ThreadScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
+                reverseLayout = true,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                itemsIndexed(state.messages, key = { _, m -> m.id }) { index, message ->
-                    val previous = state.messages.getOrNull(index - 1)
-                    val next = state.messages.getOrNull(index + 1)
+                // Newest first, so with reverseLayout the newest sits at the bottom.
+                val messages = state.messages
+                items(count = messages.size, key = { messages[messages.lastIndex - it].id }) { i ->
+                    val index = messages.lastIndex - i
+                    val message = messages[index]
+                    val previous = messages.getOrNull(index - 1)
+                    val next = messages.getOrNull(index + 1)
                     val newDay = previous == null || !Formatting.sameDay(previous.date, message.date)
 
-                    if (newDay) DaySeparator(message.date)
+                    Column(Modifier.fillMaxWidth()) {
+                        if (newDay) DaySeparator(message.date)
 
-                    // Consecutive messages from the same side are visually grouped.
-                    val firstOfGroup = newDay ||
-                        previous?.isOutgoing != message.isOutgoing ||
-                        previous.address != message.address
-                    val lastOfGroup = next == null ||
-                        next.isOutgoing != message.isOutgoing ||
-                        next.address != message.address ||
-                        !Formatting.sameDay(next.date, message.date)
+                        // Consecutive messages from the same side are visually grouped.
+                        val firstOfGroup = newDay ||
+                            previous?.isOutgoing != message.isOutgoing ||
+                            previous.address != message.address
+                        val lastOfGroup = next == null ||
+                            next.isOutgoing != message.isOutgoing ||
+                            next.address != message.address ||
+                            !Formatting.sameDay(next.date, message.date)
 
-                    MessageBubble(
-                        message = message,
-                        maxWidth = maxBubbleWidth,
-                        firstOfGroup = firstOfGroup,
-                        lastOfGroup = lastOfGroup,
-                        showSender = state.isGroup && firstOfGroup && message.isIncoming,
-                        onLongClick = { actionsFor = message },
-                        onRetry = { viewModel.resend(message) },
-                    )
+                        MessageBubble(
+                            message = message,
+                            maxWidth = maxBubbleWidth,
+                            firstOfGroup = firstOfGroup,
+                            lastOfGroup = lastOfGroup,
+                            showSender = state.isGroup && firstOfGroup && message.isIncoming,
+                            onLongClick = { actionsFor = message },
+                            onRetry = { viewModel.resend(message) },
+                        )
+                    }
                 }
             }
         }
