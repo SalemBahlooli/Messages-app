@@ -74,13 +74,14 @@
     <string name="setup_continue">Continue</string>
     <string name="set_as_default">Set as default</string>
     <string name="didnt_work">Didn\'t work?</string>
-    <string name="restricted_title">If setting the default was refused</string>
-    <string name="restricted_body">Android blocks apps installed from an APK — rather than from a store — from taking sensitive roles like the SMS handler. It isn\'t a fault in this app, and you can allow it by hand.</string>
+    <string name="restricted_title">If Android refused the request</string>
+    <string name="restricted_body">Android blocks apps installed from an APK — rather than from a store — from taking SMS permissions or becoming the SMS handler. If you saw \"App was denied access to SMS\" or \"denied access to be default SMS app\", that is this guard. It isn\'t a fault in this app, and you can allow it by hand.</string>
     <string name="restricted_step_1">Open this app\'s page in system Settings.</string>
     <string name="restricted_step_2">Tap the ⋮ menu at the top right.</string>
     <string name="restricted_step_3">Choose \"Allow restricted settings\".</string>
-    <string name="restricted_step_4">Come back and tap Set as default again.</string>
+    <string name="restricted_step_4">Come back here and try again.</string>
     <string name="restricted_note">The menu item only appears after the app has been refused once.</string>
+    <string name="restricted_adb">Installing with adb instead (adb install app-debug.apk) skips this guard entirely.</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="open_default_apps">Open Android\'s default apps list</string>
     <string name="default_apps_hint">Settings → Apps → Default apps → SMS app also works on most phones.</string>

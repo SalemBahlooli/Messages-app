@@ -96,10 +96,13 @@ fun SetupCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (!needsPermissions) {
-                    TextButton(onClick = { helpOpen = true }) { Text(stringResource(R.string.didnt_work)) }
-                    Spacer(Modifier.width(4.dp))
+                // Reachable in both states: Android's restricted-settings guard
+                // refuses the SMS permission as readily as the default-SMS role,
+                // and a user stuck at the permission step needs this most.
+                TextButton(onClick = { helpOpen = true }) {
+                    Text(stringResource(R.string.didnt_work))
                 }
+                Spacer(Modifier.width(4.dp))
                 Button(
                     onClick = if (needsPermissions) onGrantPermissions else onRequestDefaultSms
                 ) {
@@ -177,6 +180,12 @@ fun RestrictedSettingsHelp(
         }
         Text(
             stringResource(R.string.restricted_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.restricted_adb),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

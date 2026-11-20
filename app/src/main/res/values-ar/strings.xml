@@ -78,13 +78,14 @@
     <string name="setup_continue">متابعة</string>
     <string name="set_as_default">اجعله افتراضياً</string>
     <string name="didnt_work">لم ينجح؟</string>
-    <string name="restricted_title">إذا رُفض جعله افتراضياً</string>
-    <string name="restricted_body">أندرويد يمنع التطبيقات المثبّتة من ملف APK — بدل المتجر — من أخذ أدوار حسّاسة مثل تطبيق الرسائل. هذا ليس خطأً في التطبيق، وتقدر تسمح به يدوياً.</string>
+    <string name="restricted_title">إذا رفض أندرويد الطلب</string>
+    <string name="restricted_body">أندرويد يمنع التطبيقات المثبّتة من ملف APK — بدل المتجر — من أخذ صلاحيات الرسائل أو أن تصير تطبيق الرسائل الافتراضي. إذا ظهرت لك رسالة «App was denied access to SMS» أو «denied access to be default SMS app» فهذه هي الحماية. ليست خطأً في التطبيق، وتقدر تسمح بها يدوياً.</string>
     <string name="restricted_step_1">افتح صفحة التطبيق في إعدادات النظام.</string>
     <string name="restricted_step_2">اضغط قائمة ⋮ أعلى اليمين.</string>
     <string name="restricted_step_3">اختر «السماح بالإعدادات المقيّدة».</string>
-    <string name="restricted_step_4">ارجع واضغط «اجعله افتراضياً» مرة أخرى.</string>
+    <string name="restricted_step_4">ارجع هنا وحاول مرة أخرى.</string>
     <string name="restricted_note">خيار القائمة يظهر فقط بعد أن يُرفض التطبيق مرة واحدة.</string>
+    <string name="restricted_adb">التثبيت عبر adb بدلاً من ذلك ‏(adb install app-debug.apk)‏ يتجاوز هذه الحماية تماماً.</string>
     <string name="open_app_settings">افتح إعدادات التطبيق</string>
     <string name="open_default_apps">افتح قائمة التطبيقات الافتراضية</string>
     <string name="default_apps_hint">الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← تطبيق الرسائل، تنفع أيضاً في أغلب الأجهزة.</string>
