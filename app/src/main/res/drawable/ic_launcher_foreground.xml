@@ -1,9 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chat bubble with a blue-to-violet gradient on a transparent canvas. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Soft shadow under the bubble. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M34,32h40a8,8 0,0 1,8 8v22a8,8 0,0 1,-8 8h-22l-14,12v-12h-4a8,8 0,0 1,-8 -8v-22a8,8 0,0 1,8 -8z" />
+        android:fillColor="#336D5DF6"
+        android:pathData="M46,30h16a20,20 0,0 1,20 20v6a20,20 0,0 1,-20 20h-15l-11.5,8.6c-1.2,0.9 -2.8,-0.2 -2.4,-1.6l1.9,-6.6a20,20 0,0 1,-9 -16.4v-10a20,20 0,0 1,20 -20z" />
+    <path android:pathData="M46,28h16a20,20 0,0 1,20 20v6a20,20 0,0 1,-20 20h-15l-11.5,8.6c-1.2,0.9 -2.8,-0.2 -2.4,-1.6l1.9,-6.6a20,20 0,0 1,-9 -16.4v-10a20,20 0,0 1,20 -20z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="26"
+                android:startY="28"
+                android:endX="82"
+                android:endY="84">
+                <item android:offset="0" android:color="#FF3FA9FF" />
+                <item android:offset="0.55" android:color="#FF5B6CFF" />
+                <item android:offset="1" android:color="#FF9B5CF6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M36,51a4,4 0,1 0,8 0a4,4 0,1 0,-8 0zM50,51a4,4 0,1 0,8 0a4,4 0,1 0,-8 0zM64,51a4,4 0,1 0,8 0a4,4 0,1 0,-8 0z" />
 </vector>
