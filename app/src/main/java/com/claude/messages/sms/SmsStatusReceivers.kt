@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import kotlinx.coroutines.launch
 import android.net.Uri
 import android.provider.Telephony
 import com.claude.messages.data.model.Message
@@ -48,10 +49,18 @@ class SmsDeliveredReceiver : BroadcastReceiver() {
     }
 }
 
-/** Re-creates notification channels after a reboot. */
+/** Re-creates notification channels and re-arms scheduled messages after a reboot or update. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        com.claude.messages.notifications.ChannelManager(context.applicationContext)
-            .ensureBaseChannels()
+        val app = context.applicationContext
+        com.claude.messages.notifications.ChannelManager(app).ensureBaseChannels()
+        val pending = goAsync()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                MessageScheduler.rearmAll(app)
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }

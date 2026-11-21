@@ -1,6 +1,26 @@
 package com.claude.messages.ui.conversations
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -85,6 +105,9 @@ fun ConversationsScreen(
     onGrantPermissions: () -> Unit,
     onOpenAppSettings: () -> Unit,
     onOpenDefaultAppsSettings: () -> Unit,
+    onOpenStarred: () -> Unit = {},
+    onOpenInsights: () -> Unit = {},
+    onOpenBlocked: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val setupIncomplete = !state.hasSmsPermission || !state.isDefaultSmsApp
@@ -141,6 +164,13 @@ fun ConversationsScreen(
                             viewModel::toggleArchivedView,
                         )
                     }
+                    if (!state.showArchived) {
+                        OverflowMenu(
+                            onOpenStarred = onOpenStarred,
+                            onOpenInsights = onOpenInsights,
+                            onOpenBlocked = onOpenBlocked,
+                        )
+                    }
                 }
             }
 
@@ -167,8 +197,19 @@ fun ConversationsScreen(
                 )
             }
 
+            if (!state.searching && !state.inSelectionMode && state.conversations.isNotEmpty()) {
+                FilterRow(state.filter, viewModel::setFilter)
+            }
+
             when {
-                state.searching -> SearchResults(state.searchResults, onOpenThread)
+                state.searching -> SearchResults(state.searchQuery, state.searchResults, onOpenThread)
+
+                state.shown.isEmpty() && state.conversations.isNotEmpty() -> EmptyState(
+                    icon = Icons.Default.FilterList,
+                    title = stringResource(R.string.no_filter_results),
+                    actionLabel = stringResource(R.string.filter_all),
+                    onAction = { viewModel.setFilter(ConversationFilter.ALL) },
+                )
 
                 state.conversations.isEmpty() && !state.loading -> EmptyState(
                     icon = Icons.AutoMirrored.Filled.Message,
@@ -184,6 +225,8 @@ fun ConversationsScreen(
                     state = state,
                     onOpenThread = onOpenThread,
                     onToggleSelection = viewModel::toggleSelection,
+                    onSwipeRead = viewModel::markRead,
+                    onSwipeArchive = viewModel::toggleArchive,
                 )
             }
         }
@@ -195,37 +238,22 @@ private fun ConversationList(
     state: ConversationsUiState,
     onOpenThread: (Long) -> Unit,
     onToggleSelection: (Long) -> Unit,
+    onSwipeRead: (Long) -> Unit,
+    onSwipeArchive: (Long) -> Unit,
 ) {
-    val pinned = state.conversations.filter { it.pinned }
-    val rest = state.conversations.filterNot { it.pinned }
+    val shown = state.shown
+    val pinned = shown.filter { it.pinned }
+    val rest = shown.filterNot { it.pinned }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 88.dp, top = 2.dp),
-    ) {
-        if (pinned.isNotEmpty()) {
-            item(key = "header_pinned") {
-                ListHeader(stringResource(R.string.pinned), Icons.Default.PushPin)
-            }
-            items(pinned, key = { it.threadId }) { conversation ->
-                ConversationRow(
-                    conversation = conversation,
-                    selected = conversation.threadId in state.selected,
-                    onClick = {
-                        if (state.inSelectionMode) onToggleSelection(conversation.threadId)
-                        else onOpenThread(conversation.threadId)
-                    },
-                    onLongClick = { onToggleSelection(conversation.threadId) },
-                )
-            }
-            if (rest.isNotEmpty()) {
-                item(key = "header_all") {
-                    ListHeader(stringResource(R.string.all_messages), null)
-                }
-            }
-        }
-
-        items(rest, key = { it.threadId }) { conversation ->
+    @Composable
+    fun Item(conversation: Conversation) {
+        SwipeableRow(
+            conversation = conversation,
+            enabled = !state.inSelectionMode,
+            archived = state.showArchived,
+            onSwipeRead = { onSwipeRead(conversation.threadId) },
+            onSwipeArchive = { onSwipeArchive(conversation.threadId) },
+        ) {
             ConversationRow(
                 conversation = conversation,
                 selected = conversation.threadId in state.selected,
@@ -236,6 +264,25 @@ private fun ConversationList(
                 onLongClick = { onToggleSelection(conversation.threadId) },
             )
         }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 88.dp, top = 2.dp),
+    ) {
+        if (pinned.isNotEmpty()) {
+            item(key = "header_pinned") {
+                ListHeader(stringResource(R.string.pinned), Icons.Default.PushPin)
+            }
+            items(pinned, key = { it.threadId }) { conversation -> Item(conversation) }
+            if (rest.isNotEmpty()) {
+                item(key = "header_all") {
+                    ListHeader(stringResource(R.string.all_messages), null)
+                }
+            }
+        }
+
+        items(rest, key = { it.threadId }) { conversation -> Item(conversation) }
     }
 }
 
@@ -366,7 +413,8 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
 }
 
 @Composable
-private fun SearchResults(results: List<SearchHit>, onOpenThread: (Long) -> Unit) {
+private fun SearchResults(query: String, results: List<SearchHit>, onOpenThread: (Long) -> Unit) {
+    val highlight = MaterialTheme.colorScheme.primary
     if (results.isEmpty()) {
         EmptyState(
             icon = Icons.Default.Search,
@@ -402,7 +450,7 @@ private fun SearchResults(results: List<SearchHit>, onOpenThread: (Long) -> Unit
                         )
                     }
                     Text(
-                        text = hit.message.body,
+                        text = highlighted(hit.message.body, query, highlight),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -456,6 +504,15 @@ private fun ConversationRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
+                    if (conversation.blocked) {
+                        Spacer(Modifier.width(5.dp))
+                        Icon(
+                            Icons.Default.Block,
+                            stringResource(R.string.blocked_label),
+                            Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     if (conversation.muted) {
                         Spacer(Modifier.width(5.dp))
                         Icon(
@@ -524,6 +581,154 @@ private fun ConversationRow(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Starred messages, insights and the block list, out of the way but one tap off. */
+@Composable
+private fun OverflowMenu(
+    onOpenStarred: () -> Unit,
+    onOpenInsights: () -> Unit,
+    onOpenBlocked: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        HeaderAction(Icons.Default.MoreVert, stringResource(R.string.more)) { open = true }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.starred_messages)) },
+                leadingIcon = { Icon(Icons.Default.Star, null) },
+                onClick = { open = false; onOpenStarred() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.insights)) },
+                leadingIcon = { Icon(Icons.Default.Insights, null) },
+                onClick = { open = false; onOpenInsights() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.blocked_numbers)) },
+                leadingIcon = { Icon(Icons.Default.Block, null) },
+                onClick = { open = false; onOpenBlocked() },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterRow(selected: ConversationFilter, onSelect: (ConversationFilter) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+    ) {
+        items(ConversationFilter.entries.toList(), key = { it.name }) { filter ->
+            FilterChip(
+                selected = filter == selected,
+                onClick = { onSelect(filter) },
+                label = { Text(stringResource(filter.labelRes), style = MaterialTheme.typography.labelMedium) },
+                shape = CircleShape,
+                modifier = Modifier.height(30.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Swipe a conversation towards the end to mark it read, towards the start to
+ * archive it (or unarchive, inside the archive).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableRow(
+    conversation: Conversation,
+    enabled: Boolean,
+    archived: Boolean,
+    onSwipeRead: () -> Unit,
+    onSwipeArchive: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val read by rememberUpdatedState(onSwipeRead)
+    val archive by rememberUpdatedState(onSwipeArchive)
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    read()
+                    false // snap back: the row stays, now read
+                }
+
+                SwipeToDismissBoxValue.EndToStart -> {
+                    archive()
+                    true
+                }
+
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        },
+    )
+
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = enabled && conversation.hasUnread,
+        enableDismissFromEndToStart = enabled,
+        backgroundContent = {
+            val direction = state.dismissDirection
+            val toEnd = direction == SwipeToDismissBoxValue.StartToEnd
+            val color = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.tertiaryContainer
+                SwipeToDismissBoxValue.Settled -> Color.Transparent
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 1.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(color)
+                    .padding(horizontal = 22.dp),
+                contentAlignment = if (toEnd) Alignment.CenterStart else Alignment.CenterEnd,
+            ) {
+                if (direction != SwipeToDismissBoxValue.Settled) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (toEnd) Icons.Default.DoneAll
+                            else if (archived) Icons.Default.Unarchive else Icons.Default.Archive,
+                            null,
+                            Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(
+                                if (toEnd) R.string.mark_read
+                                else if (archived) R.string.unarchive else R.string.archive
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
+            }
+        },
+    ) { content() }
+}
+
+/** Search hits show where the words matched. */
+private fun highlighted(text: String, query: String, color: Color): AnnotatedString {
+    val needle = query.trim()
+    if (needle.isEmpty()) return AnnotatedString(text)
+    return buildAnnotatedString {
+        append(text)
+        var from = 0
+        while (true) {
+            val at = text.indexOf(needle, from, ignoreCase = true)
+            if (at < 0) break
+            addStyle(
+                SpanStyle(color = color, fontWeight = FontWeight.Bold, background = color.copy(alpha = 0.12f)),
+                at,
+                at + needle.length,
+            )
+            from = at + needle.length
         }
     }
 }

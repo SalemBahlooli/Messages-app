@@ -56,6 +56,43 @@ rule's tone produces a new channel and the stale one is deleted, which is what
 makes the per-rule ringtone take effect on Android 8+ rather than silently
 keeping the old sound.
 
+## Smart features
+
+- **Scheduled messages** — tap the clock in the composer (or long-press Send) and
+  pick *in an hour*, *tonight*, *tomorrow morning* or any date and time. Waiting
+  messages show in the chat as outlined bubbles; tap one to send it now or cancel
+  it (the text comes back to the composer). Alarms are re-armed after a reboot or
+  an app update.
+- **Undo send** — a configurable 3/5/10-second window with a countdown bar and an
+  *Undo* button. Leaving the chat inside the window still sends the message.
+- **Verification-code helper** — codes in OTP messages (English and Arabic,
+  including Arabic-Indic digits) get a *Copy 482913* chip under the bubble and a
+  *Copy* button on the notification.
+- **Quick replies** — one-tap chips above an empty composer, editable in the chat
+  or in Settings; seeded in the phone's language.
+- **Starred messages** — star any message from its long-press menu; every starred
+  message, from every chat, in one list.
+- **Tappable links** — links, phone numbers and e-mail addresses inside messages
+  open the browser, dialler or mail app. Amounts in bank messages are not
+  mistaken for phone numbers.
+- **Block senders** — from a chat's menu or by typing a number or sender name.
+  A blocked sender's messages are still stored (only the default SMS app can do
+  that) but arrive read, archived and silent.
+- **Quiet hours** — a nightly (or any) window in which messages arrive silently;
+  rules that bypass Do Not Disturb still ring.
+- **App lock** — fingerprint, face or the screen lock, after a cold start or ten
+  seconds in the background. Recents thumbnails are hidden while it is on.
+- **Insights** — the last 90 days: sent, received and verification codes, the
+  people you text most, the busiest time of day and the last two weeks.
+- **Export a conversation** — the whole chat as a text file, through the share sheet.
+- **Forward** and **read aloud** (text-to-speech, in Arabic for Arabic text) from
+  the message menu, which also lets you select part of a message to copy.
+- **Swipe** a conversation to archive it, or towards the other side to mark it read.
+- **Filters** above the list — All, Unread, Contacts, Unknown — and search results
+  that highlight the matched words.
+- Long chats load older messages as you scroll up, and a button jumps back to the
+  newest message.
+
 ## Everything else (the stock-app feature set)
 
 - Registers as a **default SMS app**: `SMS_DELIVER` receiver, `WAP_PUSH_DELIVER`
@@ -102,12 +139,16 @@ data and formatted in the presentation layer so they render in any locale.
 data/
   model/      Message, Conversation, Contact
   repo/       SmsRepository (system Telephony provider), ContactsRepository
-  db/         Room: NotificationRule, ThreadMeta (pin/archive/mute/draft)
+  db/         Room: NotificationRule, ThreadMeta (pin/archive/mute/draft),
+              ScheduledMessage, StarredMessage, BlockedNumber (schema v2, migrated)
+  prefs/      Appearance, FeaturePrefs (undo, quiet hours, lock, quick replies)
 notifications/
   RuleEngine       pure matching logic — no Android deps, fully unit-tested
   ChannelManager   per-rule channel lifecycle
   MessageNotifier  builds the notification, applies the winning rule
-sms/          SMS_DELIVER / WAP_PUSH receivers, sender, status receivers
+sms/          SMS_DELIVER / WAP_PUSH receivers, sender, status receivers,
+              MessageScheduler (alarms for scheduled messages)
+util/         OtpDetector, TextLinks — pure Kotlin, unit-tested
 notifications/RuleTextFormatter  renders engine results in the user's language
 ui/           Compose screens + ViewModels, bottom-nav Navigation
 ```
@@ -120,7 +161,7 @@ nowhere to store — rules, pins, archives, mutes, drafts — lives in Room.
 
 ```bash
 ./gradlew assembleDebug     # APK at app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest # 40 unit tests covering the rule engine, matching and caching
+./gradlew testDebugUnitTest # 73 unit tests: rule engine, matching, caching, OTP, links, quiet hours
 ```
 
 Requires JDK 17+ and Android SDK 34.
@@ -140,7 +181,8 @@ The app's setup card links straight to this, with the steps spelled out.
 ## Permissions
 
 `READ_SMS`, `RECEIVE_SMS`, `SEND_SMS`, `RECEIVE_MMS`, `READ_CONTACTS`,
-`POST_NOTIFICATIONS`, `VIBRATE`. The app must be set as the default SMS handler
+`POST_NOTIFICATIONS`, `VIBRATE`, `SCHEDULE_EXACT_ALARM` (scheduled messages),
+`USE_BIOMETRIC` (app lock). The app must be set as the default SMS handler
 to receive messages — Android only delivers `SMS_DELIVER` to the default app.
 
 ## Note on MMS

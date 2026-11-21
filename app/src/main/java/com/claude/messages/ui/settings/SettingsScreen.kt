@@ -67,6 +67,9 @@ fun SettingsScreen(
     onOpenRules: () -> Unit,
     onRequestDefaultSms: () -> Unit,
     onOpenSystemNotifications: () -> Unit,
+    onOpenStarred: () -> Unit = {},
+    onOpenInsights: () -> Unit = {},
+    onOpenBlocked: () -> Unit = {},
 ) {
     val context = LocalContext.current
     // Recomputed whenever the screen comes forward, so a change made in system
@@ -94,6 +97,10 @@ fun SettingsScreen(
         ) {
             SectionHeader(stringResource(R.string.settings_appearance))
             AppearanceControls()
+
+            SmartFeatureSettings()
+            PrivacySettings(onOpenBlocked = onOpenBlocked)
+            LibrarySettings(onOpenStarred = onOpenStarred, onOpenInsights = onOpenInsights)
 
             SectionHeader(stringResource(R.string.settings_notifications))
             SettingRow(
@@ -215,8 +222,6 @@ private fun AppearanceControls() {
         onSelect = Appearance::setScale,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
     )
-
-    Spacer(Modifier.height(10.dp))
 
     Spacer(Modifier.height(10.dp))
     FontPicker(selectedId = settings.fontId)

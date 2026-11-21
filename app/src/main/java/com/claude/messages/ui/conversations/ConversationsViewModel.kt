@@ -13,6 +13,7 @@ import com.claude.messages.data.model.Message
 import com.claude.messages.data.prefs.UiPrefs
 import com.claude.messages.data.repo.ContactsRepository
 import com.claude.messages.di.ServiceLocator
+import com.claude.messages.util.PhoneNumbers
 import com.claude.messages.notifications.IncomingMessage
 import com.claude.messages.notifications.MessageNotifier
 import com.claude.messages.notifications.RuleEngine
@@ -30,6 +31,22 @@ data class SearchHit(
     val displayName: String,
 )
 
+/** Quick filters above the conversation list. */
+enum class ConversationFilter(val labelRes: Int) {
+    ALL(R.string.filter_all),
+    UNREAD(R.string.filter_unread),
+    CONTACTS(R.string.filter_contacts),
+    UNKNOWN(R.string.filter_unknown),
+    ;
+
+    fun accepts(c: Conversation): Boolean = when (this) {
+        ALL -> true
+        UNREAD -> c.hasUnread
+        CONTACTS -> c.isKnownContact
+        UNKNOWN -> !c.isKnownContact && !c.isGroup
+    }
+}
+
 data class ConversationsUiState(
     val loading: Boolean = true,
     val conversations: List<Conversation> = emptyList(),
@@ -45,7 +62,10 @@ data class ConversationsUiState(
     val loadError: String? = null,
     /** The user closed the setup banner; Settings still reports the real state. */
     val setupDismissed: Boolean = false,
+    val filter: ConversationFilter = ConversationFilter.ALL,
 ) {
+    /** What the list shows: the conversations that pass the active filter. */
+    val shown: List<Conversation> get() = conversations.filter(filter::accepts)
     val inSelectionMode: Boolean get() = selected.isNotEmpty()
     val selectedConversations: List<Conversation>
         get() = conversations.filter { it.threadId in selected }
@@ -107,10 +127,12 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             val metas = runCatching { db.threadMetaDao().getAll() }
                 .getOrDefault(emptyList()).associateBy { it.threadId }
             val rules = runCatching { db.ruleDao().getEnabled() }.getOrDefault(emptyList())
+            val blockedKeys = runCatching { db.blockedDao().getAll().map { it.key }.toSet() }
+                .getOrDefault(emptySet())
 
             // One bad row shouldn't hide every other conversation.
             val decorated = raw.mapNotNull { conv ->
-                runCatching { decorate(conv, metas[conv.threadId], rules) }
+                runCatching { decorate(conv, metas[conv.threadId], rules, blockedKeys) }
                     .onFailure { Log.e(TAG, "Skipping thread ${conv.threadId}", it) }
                     .getOrNull()
             }
@@ -139,6 +161,7 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
         conv: Conversation,
         meta: ThreadMeta?,
         rules: List<NotificationRule>,
+        blockedKeys: Set<String>,
     ): Conversation {
         val contact = contacts.lookup(conv.primaryAddress)
         val memberNames = conv.addresses.map { addr ->
@@ -172,7 +195,31 @@ class ConversationsViewModel(app: Application) : AndroidViewModel(app) {
             archived = meta?.archived == true,
             muted = meta?.muted == true,
             ruleLabel = ruleLabel,
+            isKnownContact = contact != null,
+            blocked = !conv.isGroup && PhoneNumbers.blockKey(conv.primaryAddress) in blockedKeys,
         )
+    }
+
+    fun setFilter(filter: ConversationFilter) = _state.update { it.copy(filter = filter) }
+
+    // --------------------------------------------------------- swipe actions
+
+    fun markRead(threadId: Long) {
+        viewModelScope.launch {
+            smsRepo.markThreadRead(threadId)
+            notifier.cancel(threadId)
+            refresh()
+        }
+    }
+
+    /** Archives a row, or brings it back when the archive is open. */
+    fun toggleArchive(threadId: Long) {
+        val target = !_state.value.showArchived
+        viewModelScope.launch {
+            val current = db.threadMetaDao().get(threadId) ?: ThreadMeta(threadId = threadId)
+            db.threadMetaDao().upsert(current.copy(archived = target))
+            refresh()
+        }
     }
 
     fun dismissSetupBanner() {

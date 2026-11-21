@@ -19,6 +19,8 @@ import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import com.claude.messages.R
+import com.claude.messages.data.prefs.FeaturePrefs
+import com.claude.messages.util.OtpDetector
 import com.claude.messages.data.db.RuleImportance
 import com.claude.messages.data.db.VibrationPattern
 import com.claude.messages.data.model.Message
@@ -63,7 +65,10 @@ class MessageNotifier(private val context: Context) {
             )
         val rule = matched?.rule
 
-        val muted = meta?.muted == true
+        // Quiet hours act like a temporary mute, except for rules the user
+        // explicitly allowed through Do Not Disturb.
+        val quiet = FeaturePrefs.isQuietNow(context) && rule?.bypassDnd != true
+        val muted = meta?.muted == true || quiet
         val channelId = when {
             muted -> ChannelManager.CHANNEL_SILENT
             rule != null -> channels.channelFor(rule)
@@ -78,7 +83,7 @@ class MessageNotifier(private val context: Context) {
             transcript.toList()
         }
 
-        val self = Person.Builder().setName("You").build()
+        val self = Person.Builder().setName(context.getString(R.string.you)).build()
         val title = if (rule == null || rule.titlePrefix.isBlank()) {
             senderName
         } else {
@@ -113,13 +118,32 @@ class MessageNotifier(private val context: Context) {
             .setGroup(GROUP_KEY)
             .addAction(replyAction(message.threadId))
             .addAction(markReadAction(message.threadId))
-            .setVisibility(
-                if (rule?.hideContentOnLockScreen == true) {
-                    NotificationCompat.VISIBILITY_PRIVATE
-                } else {
-                    NotificationCompat.VISIBILITY_PRIVATE
-                }
+
+        // A rule can keep the text off the lock screen: PRIVATE alone defers to
+        // the phone's setting, so give the lock screen a redacted copy as well.
+        if (rule?.hideContentOnLockScreen == true) {
+            builder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            builder.setPublicVersion(
+                NotificationCompat.Builder(context, channelId)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle(context.getString(R.string.new_message_hidden))
+                    .setColor(rule.accentColor ?: DEFAULT_ACCENT)
+                    .build()
             )
+        }
+
+        // Verification messages get a one-tap copy of the code.
+        if (FeaturePrefs.current(context).otpHelper) {
+            OtpDetector.find(message.body)?.let { code ->
+                builder.addAction(
+                    NotificationCompat.Action.Builder(
+                        R.drawable.ic_notification,
+                        context.getString(R.string.copy_code, code),
+                        NotificationActionReceiver.copyCodeIntent(context, message.threadId, code),
+                    ).build()
+                )
+            }
+        }
 
         rule?.accentColor?.let { builder.setColor(it).setColorized(false) }
             ?: builder.setColor(DEFAULT_ACCENT)

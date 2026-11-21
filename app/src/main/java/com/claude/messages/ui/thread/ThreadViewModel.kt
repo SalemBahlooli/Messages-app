@@ -1,6 +1,28 @@
 package com.claude.messages.ui.thread
 
 import android.app.Application
+import android.content.Intent
+import android.speech.tts.TextToSpeech
+import androidx.core.content.FileProvider
+import com.claude.messages.data.db.BlockedNumber
+import com.claude.messages.data.db.ScheduledMessage
+import com.claude.messages.data.db.StarredMessage
+import com.claude.messages.data.prefs.FeaturePrefs
+import com.claude.messages.sms.MessageScheduler
+import com.claude.messages.util.Formatting
+import com.claude.messages.util.PhoneNumbers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,8 +57,29 @@ data class ThreadUiState(
     val isGroup: Boolean = false,
     /** Transient message shown in a snackbar, e.g. why a send failed. */
     val errorMessage: String? = null,
+    /** Messages waiting for their scheduled time. */
+    val scheduled: List<ScheduledMessage> = emptyList(),
+    val starredIds: Set<Long> = emptySet(),
+    val blocked: Boolean = false,
+    /** A sent message still inside its undo window. */
+    val pendingSend: PendingSend? = null,
+    /** How many of the newest messages are loaded; grows as the user scrolls up. */
+    val messageLimit: Int = PAGE_SIZE,
 ) {
     val canSend: Boolean get() = draft.isNotBlank() && recipients.isNotEmpty() && !sending
+    val hasMore: Boolean get() = messages.size >= messageLimit
+
+    companion object {
+        const val PAGE_SIZE = 300
+    }
+}
+
+data class PendingSend(val body: String, val sendAt: Long, val seconds: Int)
+
+/** One-off things the screen has to do, which don't belong in state. */
+sealed interface ThreadEvent {
+    data class Share(val intent: Intent) : ThreadEvent
+    data class Toast(val text: String) : ThreadEvent
 }
 
 class ThreadViewModel(app: Application) : AndroidViewModel(app) {
@@ -51,6 +94,13 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<ThreadUiState> = _state.asStateFlow()
 
     private var initialized = false
+    private var pendingJob: Job? = null
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var ttsQueued: String? = null
+
+    private val _events = MutableSharedFlow<ThreadEvent>(extraBufferCapacity = 4)
+    val events: SharedFlow<ThreadEvent> = _events
 
     private companion object {
         const val TAG = "ThreadVM"
@@ -98,7 +148,7 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
             val threadId = _state.value.threadId
             // Provider reads go through OEM code; degrade rather than crash.
             val messages = runCatching {
-                if (threadId > 0) smsRepo.loadMessages(threadId) else emptyList()
+                if (threadId > 0) smsRepo.loadMessages(threadId, _state.value.messageLimit) else emptyList()
             }.onFailure { Log.e(TAG, "Could not load thread $threadId", it) }
                 .getOrDefault(emptyList())
 
@@ -118,6 +168,15 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
                     ?: ContactsRepository.formatNumber(addr)
             }
             val rules = runCatching { db.ruleDao().getAll() }.getOrDefault(emptyList())
+            val scheduled = runCatching {
+                if (threadId > 0) db.scheduledDao().forThread(threadId) else emptyList()
+            }.getOrDefault(emptyList())
+            val starred = runCatching {
+                if (threadId > 0) db.starredDao().idsForThread(threadId).toSet() else emptySet()
+            }.getOrDefault(emptySet())
+            val blocked = recipients.size == 1 && runCatching {
+                db.blockedDao().count(PhoneNumbers.blockKey(recipients.first())) > 0
+            }.getOrDefault(false)
 
             _state.update {
                 it.copy(
@@ -131,7 +190,14 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
                     muted = meta?.muted == true,
                     forcedRuleId = meta?.forcedRuleId,
                     availableRules = rules,
-                    draft = if (it.draft.isEmpty()) meta?.draft.orEmpty() else it.draft,
+                    draft = if (it.draft.isEmpty() && it.pendingSend == null) {
+                        meta?.draft.orEmpty()
+                    } else {
+                        it.draft
+                    },
+                    scheduled = scheduled,
+                    starredIds = starred,
+                    blocked = blocked,
                 )
             }
 
@@ -156,11 +222,61 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
 
-        _state.update { it.copy(sending = true, draft = "") }
+        // A second message while one is still in its undo window: let the
+        // first one go now so they arrive in the order they were written.
+        flushPendingSend()
+
+        val seconds = FeaturePrefs.settings.value.undoSeconds
+        if (seconds <= 0) {
+            _state.update { it.copy(draft = "") }
+            deliver(current.recipients, body)
+            return
+        }
+
+        _state.update {
+            it.copy(
+                draft = "",
+                pendingSend = PendingSend(body, System.currentTimeMillis() + seconds * 1000L, seconds),
+            )
+        }
+        viewModelScope.launch { persistDraft("") }
+        pendingJob = viewModelScope.launch {
+            delay(seconds * 1000L)
+            val pending = _state.value.pendingSend ?: return@launch
+            _state.update { it.copy(pendingSend = null) }
+            deliver(_state.value.recipients, pending.body)
+        }
+    }
+
+    /** Takes back a message that is still in its undo window. */
+    fun undoSend() {
+        val pending = _state.value.pendingSend ?: return
+        pendingJob?.cancel()
+        pendingJob = null
+        _state.update {
+            it.copy(
+                pendingSend = null,
+                draft = if (it.draft.isBlank()) pending.body else pending.body + "\n" + it.draft,
+            )
+        }
+        _events.tryEmit(ThreadEvent.Toast(getApplication<Application>().getString(R.string.send_cancelled)))
+    }
+
+    /** Sends a message in its undo window immediately. */
+    private fun flushPendingSend() {
+        val pending = _state.value.pendingSend ?: return
+        pendingJob?.cancel()
+        pendingJob = null
+        _state.update { it.copy(pendingSend = null) }
+        deliver(_state.value.recipients, pending.body)
+    }
+
+    private fun deliver(recipients: List<String>, body: String) {
+        _state.update { it.copy(sending = true) }
         viewModelScope.launch {
-            when (val result = sender.send(current.recipients, body)) {
+            when (val result = sender.send(recipients, body)) {
                 is SendResult.Success -> {
-                    persistDraft("")
+                    persistDraft(_state.value.draft)
                     _state.update {
                         it.copy(
                             sending = false,
@@ -173,11 +289,84 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
 
                 is SendResult.Failure -> _state.update {
                     // Give the text back so the user doesn't lose it.
-                    it.copy(sending = false, draft = body, errorMessage = result.reason)
+                    it.copy(
+                        sending = false,
+                        draft = if (it.draft.isBlank()) body else it.draft,
+                        errorMessage = result.reason,
+                    )
                 }
             }
             refresh()
         }
+    }
+
+    // ------------------------------------------------------------ scheduling
+
+    /** Queues the current draft to be sent at [sendAt]. */
+    fun schedule(sendAt: Long) {
+        val current = _state.value
+        val body = current.draft.trim()
+        val app = getApplication<Application>()
+        if (body.isEmpty()) return
+        if (current.recipients.isEmpty()) {
+            _state.update { it.copy(errorMessage = app.getString(R.string.err_no_recipient)) }
+            return
+        }
+        if (sendAt <= System.currentTimeMillis()) {
+            _state.update { it.copy(errorMessage = app.getString(R.string.schedule_past)) }
+            return
+        }
+        viewModelScope.launch {
+            val threadId = current.threadId.takeIf { it > 0 }
+                ?: smsRepo.threadIdFor(current.recipients.toSet())
+            MessageScheduler.schedule(
+                app,
+                ScheduledMessage(
+                    threadId = threadId,
+                    recipients = current.recipients.joinToString(","),
+                    body = body,
+                    sendAt = sendAt,
+                ),
+            )
+            persistDraft("")
+            _state.update {
+                it.copy(
+                    draft = "",
+                    threadId = if (it.threadId > 0) it.threadId else threadId,
+                )
+            }
+            _events.tryEmit(
+                ThreadEvent.Toast(app.getString(R.string.scheduled_done, Formatting.fullTimestamp(sendAt)))
+            )
+            refresh()
+        }
+    }
+
+    fun cancelScheduled(id: Long) {
+        viewModelScope.launch {
+            val item = _state.value.scheduled.firstOrNull { it.id == id }
+            MessageScheduler.cancel(getApplication(), id)
+            // Hand the text back rather than throwing it away.
+            if (item != null && _state.value.draft.isBlank()) {
+                _state.update { it.copy(draft = item.body) }
+            }
+            refresh()
+        }
+    }
+
+    fun sendScheduledNow(id: Long) {
+        viewModelScope.launch {
+            MessageScheduler.sendNow(getApplication(), id)
+            refresh()
+        }
+    }
+
+    /** Older messages, as the user scrolls up past what is loaded. */
+    fun loadMore() {
+        val current = _state.value
+        if (!current.hasMore || current.loading) return
+        _state.update { it.copy(messageLimit = it.messageLimit + ThreadUiState.PAGE_SIZE) }
+        refresh()
     }
 
     fun consumeError() = _state.update { it.copy(errorMessage = null) }
@@ -265,5 +454,141 @@ class ThreadViewModel(app: Application) : AndroidViewModel(app) {
             }
             onDone()
         }
+    }
+
+    // ----------------------------------------------------------- star & block
+
+    fun toggleStar(message: Message) {
+        viewModelScope.launch {
+            val dao = db.starredDao()
+            if (message.id in _state.value.starredIds) {
+                dao.delete(message.id)
+            } else {
+                dao.upsert(
+                    StarredMessage(
+                        messageId = message.id,
+                        threadId = message.threadId,
+                        address = message.address,
+                        body = message.body,
+                        date = message.date,
+                        outgoing = message.isOutgoing,
+                    )
+                )
+            }
+            refresh()
+        }
+    }
+
+    fun toggleBlock() {
+        val address = _state.value.recipients.singleOrNull() ?: return
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val key = PhoneNumbers.blockKey(address)
+            val dao = db.blockedDao()
+            val name = _state.value.title
+            if (dao.count(key) > 0) {
+                dao.delete(key)
+                _events.tryEmit(ThreadEvent.Toast(app.getString(R.string.unblocked_toast, name)))
+            } else {
+                dao.upsert(BlockedNumber(key = key, display = address))
+                _events.tryEmit(ThreadEvent.Toast(app.getString(R.string.blocked_toast, name)))
+            }
+            refresh()
+        }
+    }
+
+    // ----------------------------------------------------------- export & tts
+
+    /** Writes the whole conversation to a text file and offers to share it. */
+    fun exportConversation() {
+        val current = _state.value
+        if (current.threadId <= 0) return
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val intent = runCatching {
+                withContext(Dispatchers.IO) {
+                    val all = smsRepo.loadMessages(current.threadId, limit = 100_000)
+                    val me = app.getString(R.string.me)
+                    val names = mutableMapOf<String, String>()
+                    val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                    val text = buildString {
+                        appendLine(current.title)
+                        appendLine("—".repeat(24))
+                        all.forEach { m ->
+                            val who = if (m.isOutgoing) me else names.getOrPut(m.address) {
+                                contacts.lookup(m.address)?.name?.takeIf { it.isNotBlank() }
+                                    ?: ContactsRepository.formatNumber(m.address)
+                            }
+                            append('[').append(stamp.format(Date(m.date))).append("] ")
+                            append(who).append(": ").appendLine(m.body)
+                        }
+                    }
+                    val dir = File(app.cacheDir, "exports").apply { mkdirs() }
+                    val safe = current.title.replace(Regex("[^\\p{L}\\p{N}]+"), "_").take(40).ifBlank { "chat" }
+                    val file = File(dir, "$safe.txt").apply { writeText(text) }
+                    val uri = FileProvider.getUriForFile(app, "${app.packageName}.files", file)
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, current.title)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    Intent.createChooser(send, app.getString(R.string.export_chat))
+                }
+            }.onFailure { Log.e(TAG, "Export failed", it) }.getOrNull()
+
+            _events.tryEmit(
+                if (intent != null) ThreadEvent.Share(intent)
+                else ThreadEvent.Toast(app.getString(R.string.export_failed))
+            )
+        }
+    }
+
+    /** Reads a message out loud, in Arabic when the text is Arabic. */
+    fun speak(message: Message) {
+        val engine = tts
+        if (engine == null) {
+            ttsQueued = message.body
+            tts = TextToSpeech(getApplication()) { status ->
+                ttsReady = status == TextToSpeech.SUCCESS
+                if (!ttsReady) {
+                    _events.tryEmit(
+                        ThreadEvent.Toast(getApplication<Application>().getString(R.string.tts_unavailable))
+                    )
+                    return@TextToSpeech
+                }
+                ttsQueued?.let(::speakNow)
+                ttsQueued = null
+            }
+            return
+        }
+        if (ttsReady) speakNow(message.body) else ttsQueued = message.body
+    }
+
+    private fun speakNow(text: String) {
+        val engine = tts ?: return
+        val arabic = text.any { it in '\u0600'..'\u06FF' }
+        val result = engine.setLanguage(if (arabic) Locale("ar") else Locale.getDefault())
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            _events.tryEmit(ThreadEvent.Toast(getApplication<Application>().getString(R.string.tts_unavailable)))
+            return
+        }
+        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "message")
+    }
+
+    override fun onCleared() {
+        // Leaving the chat inside the undo window still sends: the user did
+        // press Send. This scope outlives the view model on purpose.
+        _state.value.pendingSend?.let { pending ->
+            pendingJob?.cancel()
+            val recipients = _state.value.recipients
+            val appSender = sender
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                appSender.send(recipients, pending.body)
+            }
+        }
+        tts?.shutdown()
+        tts = null
+        super.onCleared()
     }
 }

@@ -50,6 +50,9 @@ data class Conversation(
     val muted: Boolean = false,
     /** Name of the notification rule that currently applies, if any. */
     val ruleLabel: String? = null,
+    /** The sender is in the phone book. */
+    val isKnownContact: Boolean = false,
+    val blocked: Boolean = false,
 ) {
     val hasUnread: Boolean get() = unreadCount > 0
     val primaryAddress: String get() = addresses.firstOrNull().orEmpty()

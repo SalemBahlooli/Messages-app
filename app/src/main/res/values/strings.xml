@@ -276,4 +276,97 @@
     <string name="money_balance_caveat">From the most recent message each bank sent — it may be out of date.</string>
     <string name="money_top_spend">Where it went</string>
     <string name="money_transactions">Transactions</string>
+
+    <!-- Smart features -->
+    <string name="schedule_send">Schedule message</string>
+    <string name="schedule_in_1h">In 1 hour</string>
+    <string name="schedule_tonight">Tonight, 9:00 PM</string>
+    <string name="schedule_tomorrow">Tomorrow, 8:00 AM</string>
+    <string name="schedule_custom">Pick date and time…</string>
+    <string name="schedule_hint">Long-press send to schedule</string>
+    <string name="scheduled_for">Scheduled · %s</string>
+    <string name="scheduled_send_now">Send now</string>
+    <string name="scheduled_cancel">Cancel</string>
+    <string name="scheduled_done">Scheduled for %s</string>
+    <string name="schedule_past">Pick a time in the future</string>
+    <string name="scheduled_title">Scheduled message</string>
+    <string name="sending_in">Sending in %d s</string>
+    <string name="undo">Undo</string>
+    <string name="send_cancelled">Not sent — your text is back in the box</string>
+    <string name="quick_replies">Quick replies</string>
+    <string name="quick_reply_add">Add</string>
+    <string name="quick_reply_hint">A reply you send often</string>
+    <string name="quick_replies_manage">Edit quick replies</string>
+    <string name="copy_code">Copy %s</string>
+    <string name="code_copied">Code %s copied</string>
+    <string name="otp_helper">Verification code helper</string>
+    <string name="otp_helper_hint">Copy the code from a verification message in one tap — in the chat and from the notification</string>
+    <string name="star">Star</string>
+    <string name="unstar">Remove star</string>
+    <string name="starred">Starred</string>
+    <string name="starred_messages">Starred messages</string>
+    <string name="starred_messages_hint">Messages you starred, from every chat</string>
+    <string name="no_starred">No starred messages</string>
+    <string name="no_starred_hint">Long-press a message and tap Star to keep it here</string>
+    <string name="block_number">Block number</string>
+    <string name="unblock_number">Unblock</string>
+    <string name="blocked_numbers">Blocked numbers</string>
+    <string name="blocked_numbers_hint">Messages from these senders are kept quietly in the archive, with no notification</string>
+    <string name="no_blocked">No blocked numbers</string>
+    <string name="blocked_toast">%s blocked</string>
+    <string name="unblocked_toast">%s unblocked</string>
+    <string name="blocked_label">Blocked</string>
+    <string name="block_add">Block a sender</string>
+    <string name="block_add_hint">Number or sender name</string>
+    <string name="quiet_hours">Quiet hours</string>
+    <string name="quiet_hours_hint">Messages arrive silently in this window. Rules that bypass Do Not Disturb still ring.</string>
+    <string name="quiet_from">From %s</string>
+    <string name="quiet_to">To %s</string>
+    <string name="app_lock">App lock</string>
+    <string name="app_lock_hint">Ask for fingerprint, face or screen lock to open your messages</string>
+    <string name="app_lock_unavailable">Set up a screen lock on this phone first</string>
+    <string name="unlock">Unlock</string>
+    <string name="locked_title">Your messages are locked</string>
+    <string name="unlock_subtitle">Confirm it\'s you</string>
+    <string name="undo_send">Undo send</string>
+    <string name="undo_send_hint">A few seconds to take a message back before it goes</string>
+    <string name="undo_off">Off</string>
+    <string name="seconds_short">%d s</string>
+    <string name="filter_all">All</string>
+    <string name="filter_unread">Unread</string>
+    <string name="filter_contacts">Contacts</string>
+    <string name="filter_unknown">Unknown</string>
+    <string name="no_filter_results">Nothing in this filter</string>
+    <string name="insights">Insights</string>
+    <string name="insights_hint">Who you text most, and when</string>
+    <string name="insights_period">Last 90 days</string>
+    <string name="insights_sent">Sent</string>
+    <string name="insights_received">Received</string>
+    <string name="insights_codes">Codes</string>
+    <string name="insights_top">Most messaged</string>
+    <string name="insights_hours">Time of day</string>
+    <string name="insights_days">Last 14 days</string>
+    <string name="insights_busiest">Busiest around %s</string>
+    <string name="insights_per_day">%s a day on average</string>
+    <string name="insights_empty">No messages in the last 90 days</string>
+    <string name="export_chat">Export conversation</string>
+    <string name="export_failed">Couldn\'t export this conversation</string>
+    <string name="me">Me</string>
+    <string name="forward">Forward</string>
+    <string name="read_aloud">Read aloud</string>
+    <string name="tts_unavailable">Text-to-speech isn\'t available on this phone</string>
+    <string name="scroll_to_latest">Jump to latest</string>
+    <string name="you">You</string>
+    <string name="new_message_hidden">New message</string>
+    <string name="settings_smart">Smart features</string>
+    <string name="settings_privacy">Privacy and security</string>
+    <string name="settings_library">Your messages</string>
+    <string name="select_text_hint">Press and hold the text to select part of it</string>
+    <string-array name="default_quick_replies">
+        <item>OK 👍</item>
+        <item>On my way 🚗</item>
+        <item>I\'ll call you later</item>
+        <item>Busy right now, will reply soon</item>
+        <item>Thank you 🙏</item>
+    </string-array>
 </resources>

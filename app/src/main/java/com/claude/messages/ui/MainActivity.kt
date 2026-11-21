@@ -4,7 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.os.Build
+import androidx.compose.runtime.collectAsState
+import com.claude.messages.data.prefs.FeaturePrefs
+import com.claude.messages.ui.library.BlockedScreen
+import com.claude.messages.ui.library.BlockedViewModel
+import com.claude.messages.ui.library.InsightsScreen
+import com.claude.messages.ui.library.InsightsViewModel
+import com.claude.messages.ui.library.StarredScreen
+import com.claude.messages.ui.library.StarredViewModel
+import com.claude.messages.ui.lock.AppLock
+import com.claude.messages.ui.lock.LockScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,7 +68,7 @@ private sealed interface Destination {
     data class Compose(val address: String, val body: String) : Destination
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     /**
      * Deep links arriving after the activity is created. The activity is
@@ -107,7 +118,7 @@ class MainActivity : ComponentActivity() {
                         // Slides away on full-screen destinations so a chat or
                         // the rule editor gets the whole display.
                         AnimatedVisibility(
-                            visible = currentTab != null,
+                            visible = currentTab != null && !AppLock.locked.collectAsState().value,
                             enter = slideInVertically { it },
                             exit = slideOutVertically { it },
                         ) {
@@ -118,17 +129,26 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                 ) { scaffoldPadding ->
-                    AppNavHost(
-                        navController = navController,
-                        // Only the bottom inset is consumed here; each screen
-                        // still draws its own top bar under the status bar.
-                        contentPadding = scaffoldPadding,
-                        onRequestDefaultSms = ::requestDefaultSms,
-                        onGrantPermissions = ::requestMissingPermissions,
-                        onOpenAppSettings = ::openAppSettings,
-                        onOpenDefaultAppsSettings = ::openDefaultAppsSettings,
-                        onOpenSystemNotifications = ::openSystemNotificationSettings,
-                    )
+                    val locked by AppLock.locked.collectAsState()
+                    // Ask straight away whenever the lock engages.
+                    LaunchedEffect(locked) { if (locked) AppLock.prompt(this@MainActivity) }
+                    // The lock is drawn over the app rather than in place of it, so
+                    // navigation (and a notification's deep link) keeps working
+                    // underneath while the user authenticates.
+                    Box(Modifier.fillMaxSize()) {
+                        AppNavHost(
+                            navController = navController,
+                            // Only the bottom inset is consumed here; each screen
+                            // still draws its own top bar under the status bar.
+                            contentPadding = scaffoldPadding,
+                            onRequestDefaultSms = ::requestDefaultSms,
+                            onGrantPermissions = ::requestMissingPermissions,
+                            onOpenAppSettings = ::openAppSettings,
+                            onOpenDefaultAppsSettings = ::openDefaultAppsSettings,
+                            onOpenSystemNotifications = ::openSystemNotificationSettings,
+                        )
+                        if (locked) LockScreen(onUnlock = { AppLock.prompt(this@MainActivity) })
+                    }
                 }
             }
         }
@@ -167,6 +187,9 @@ class MainActivity : ComponentActivity() {
                         onGrantPermissions = onGrantPermissions,
                         onOpenAppSettings = onOpenAppSettings,
                         onOpenDefaultAppsSettings = onOpenDefaultAppsSettings,
+                        onOpenStarred = { navController.navigate("starred") },
+                        onOpenInsights = { navController.navigate("insights") },
+                        onOpenBlocked = { navController.navigate("blocked") },
                     )
                 }
 
@@ -202,7 +225,33 @@ class MainActivity : ComponentActivity() {
                         onOpenRules = { navController.switchTab(HomeTab.RULES) },
                         onRequestDefaultSms = onRequestDefaultSms,
                         onOpenSystemNotifications = onOpenSystemNotifications,
+                        onOpenStarred = { navController.navigate("starred") },
+                        onOpenInsights = { navController.navigate("insights") },
+                        onOpenBlocked = { navController.navigate("blocked") },
                     )
+                }
+
+                composable("starred") {
+                    val vm: StarredViewModel = viewModel()
+                    StarredScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onOpenThread = { navController.navigate("thread/$it") },
+                    )
+                }
+
+                composable("insights") {
+                    val vm: InsightsViewModel = viewModel()
+                    InsightsScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onOpenThread = { navController.navigate("thread/$it") },
+                    )
+                }
+
+                composable("blocked") {
+                    val vm: BlockedViewModel = viewModel()
+                    BlockedScreen(viewModel = vm, onBack = { navController.popBackStack() })
                 }
 
                 composable(
@@ -212,7 +261,11 @@ class MainActivity : ComponentActivity() {
                     val threadId = entry.arguments?.getLong("threadId") ?: -1L
                     val vm: ThreadViewModel = viewModel()
                     LaunchedEffect(threadId) { vm.open(threadId) }
-                    ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                    ThreadScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onForward = { body -> navController.navigate("new?body=${Uri.encode(body)}") },
+                    )
                 }
 
                 composable(
@@ -227,17 +280,30 @@ class MainActivity : ComponentActivity() {
                     val vm: ThreadViewModel = viewModel()
                     // Passing the address is what lets a brand-new conversation send.
                     LaunchedEffect(address) { vm.open(-1L, address, body) }
-                    ThreadScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                    ThreadScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onForward = { body -> navController.navigate("new?body=${Uri.encode(body)}") },
+                    )
                 }
 
-                composable("new") {
+                composable(
+                    route = "new?body={body}",
+                    arguments = listOf(
+                        navArgument("body") { type = NavType.StringType; defaultValue = "" },
+                    ),
+                ) { entry ->
+                    // Forwarding carries the text along to whoever is picked.
+                    val body = entry.arguments?.getString("body").orEmpty()
                     val vm: NewMessageViewModel = viewModel()
                     NewMessageScreen(
                         viewModel = vm,
                         onBack = { navController.popBackStack() },
                         onCompose = { address ->
                             navController.popBackStack()
-                            navController.navigate("compose?address=${Uri.encode(address)}&body=")
+                            navController.navigate(
+                                "compose?address=${Uri.encode(address)}&body=${Uri.encode(body)}"
+                            )
                         },
                     )
                 }
@@ -268,6 +334,21 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         destinationOf(intent)?.let(deepLinks::tryEmit)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val lockOn = FeaturePrefs.current(this).appLockEnabled
+        AppLock.onStart(this, lockOn)
+        // Keep the conversation list out of the recent-apps thumbnail when locked.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            setRecentsScreenshotEnabled(!lockOn)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AppLock.onStop()
     }
 
     override fun onResume() {

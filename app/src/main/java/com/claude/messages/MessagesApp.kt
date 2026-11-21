@@ -7,6 +7,8 @@ import com.claude.messages.data.db.RuleImportance
 import com.claude.messages.data.db.SenderMatch
 import com.claude.messages.data.db.VibrationPattern
 import com.claude.messages.data.prefs.Appearance
+import com.claude.messages.data.prefs.FeaturePrefs
+import com.claude.messages.sms.MessageScheduler
 import com.claude.messages.di.ServiceLocator
 import com.claude.messages.notifications.ChannelManager
 import com.claude.messages.ui.theme.AppFonts
@@ -23,8 +25,11 @@ class MessagesApp : Application() {
         super.onCreate()
         Appearance.init(this)
         AppFonts.init(this)
+        FeaturePrefs.init(this)
         ChannelManager(this).ensureBaseChannels()
         scope.launch { seedStarterRules() }
+        // A force-stop clears alarms; re-arming on start keeps schedules honest.
+        scope.launch { MessageScheduler.rearmAll(this@MessagesApp) }
 
         // Messages can also change from outside this process (another app, a
         // restore); mirror those changes into the open screens.

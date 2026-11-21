@@ -280,4 +280,97 @@
     <string name="money_balance_caveat">من آخر رسالة أرسلها كل بنك — قد يكون قديماً.</string>
     <string name="money_top_spend">وين ذهبت</string>
     <string name="money_transactions">العمليات</string>
+
+    <!-- Smart features -->
+    <string name="schedule_send">جدولة الرسالة</string>
+    <string name="schedule_in_1h">بعد ساعة</string>
+    <string name="schedule_tonight">الليلة، ٩:٠٠ م</string>
+    <string name="schedule_tomorrow">بكرة، ٨:٠٠ ص</string>
+    <string name="schedule_custom">اختر التاريخ والوقت…</string>
+    <string name="schedule_hint">اضغط مطولاً على زر الإرسال للجدولة</string>
+    <string name="scheduled_for">مجدولة · %s</string>
+    <string name="scheduled_send_now">أرسل الآن</string>
+    <string name="scheduled_cancel">إلغاء الجدولة</string>
+    <string name="scheduled_done">تمت الجدولة لـ %s</string>
+    <string name="schedule_past">اختر وقتاً في المستقبل</string>
+    <string name="scheduled_title">رسالة مجدولة</string>
+    <string name="sending_in">يُرسل خلال %d ث</string>
+    <string name="undo">تراجع</string>
+    <string name="send_cancelled">ما انرسلت — رجع النص للمربع</string>
+    <string name="quick_replies">ردود جاهزة</string>
+    <string name="quick_reply_add">إضافة</string>
+    <string name="quick_reply_hint">رد ترسله كثيراً</string>
+    <string name="quick_replies_manage">تعديل الردود الجاهزة</string>
+    <string name="copy_code">نسخ %s</string>
+    <string name="code_copied">تم نسخ الرمز %s</string>
+    <string name="otp_helper">مساعد رموز التحقق</string>
+    <string name="otp_helper_hint">انسخ رمز التحقق بضغطة وحدة — من المحادثة ومن الإشعار</string>
+    <string name="star">تمييز بنجمة</string>
+    <string name="unstar">إزالة النجمة</string>
+    <string name="starred">مميزة</string>
+    <string name="starred_messages">الرسائل المميزة</string>
+    <string name="starred_messages_hint">الرسائل اللي ميزتها بنجمة من كل المحادثات</string>
+    <string name="no_starred">لا توجد رسائل مميزة</string>
+    <string name="no_starred_hint">اضغط مطولاً على أي رسالة واختر «تمييز بنجمة» عشان تلقاها هنا</string>
+    <string name="block_number">حظر الرقم</string>
+    <string name="unblock_number">إلغاء الحظر</string>
+    <string name="blocked_numbers">الأرقام المحظورة</string>
+    <string name="blocked_numbers_hint">رسائل هالمرسلين تنحفظ بهدوء في الأرشيف وبدون إشعار</string>
+    <string name="no_blocked">لا توجد أرقام محظورة</string>
+    <string name="blocked_toast">تم حظر %s</string>
+    <string name="unblocked_toast">تم إلغاء حظر %s</string>
+    <string name="blocked_label">محظور</string>
+    <string name="block_add">حظر مرسل</string>
+    <string name="block_add_hint">الرقم أو اسم المرسل</string>
+    <string name="quiet_hours">ساعات الهدوء</string>
+    <string name="quiet_hours_hint">الرسائل توصل بصمت في هالفترة. القواعد اللي تتجاوز «عدم الإزعاج» تبقى ترن.</string>
+    <string name="quiet_from">من %s</string>
+    <string name="quiet_to">إلى %s</string>
+    <string name="app_lock">قفل التطبيق</string>
+    <string name="app_lock_hint">يطلب البصمة أو الوجه أو قفل الشاشة لفتح رسائلك</string>
+    <string name="app_lock_unavailable">فعّل قفل الشاشة في الجوال أولاً</string>
+    <string name="unlock">فتح القفل</string>
+    <string name="locked_title">رسائلك مقفلة</string>
+    <string name="unlock_subtitle">أكّد إنه أنت</string>
+    <string name="undo_send">التراجع عن الإرسال</string>
+    <string name="undo_send_hint">ثواني تقدر فيها تسحب الرسالة قبل ما تنرسل</string>
+    <string name="undo_off">إيقاف</string>
+    <string name="seconds_short">%d ث</string>
+    <string name="filter_all">الكل</string>
+    <string name="filter_unread">غير مقروءة</string>
+    <string name="filter_contacts">جهات الاتصال</string>
+    <string name="filter_unknown">غير معروفة</string>
+    <string name="no_filter_results">لا شيء في هذا التصنيف</string>
+    <string name="insights">إحصائيات</string>
+    <string name="insights_hint">مين أكثر واحد تراسله، ومتى</string>
+    <string name="insights_period">آخر ٩٠ يوم</string>
+    <string name="insights_sent">مرسلة</string>
+    <string name="insights_received">مستلمة</string>
+    <string name="insights_codes">رموز تحقق</string>
+    <string name="insights_top">الأكثر مراسلة</string>
+    <string name="insights_hours">أوقات اليوم</string>
+    <string name="insights_days">آخر ١٤ يوم</string>
+    <string name="insights_busiest">أكثر وقت نشاط حوالي %s</string>
+    <string name="insights_per_day">%s يومياً بالمتوسط</string>
+    <string name="insights_empty">لا توجد رسائل في آخر ٩٠ يوم</string>
+    <string name="export_chat">تصدير المحادثة</string>
+    <string name="export_failed">تعذّر تصدير المحادثة</string>
+    <string name="me">أنا</string>
+    <string name="forward">إعادة توجيه</string>
+    <string name="read_aloud">قراءة بصوت</string>
+    <string name="tts_unavailable">القراءة الصوتية غير متاحة في هذا الجوال</string>
+    <string name="scroll_to_latest">إلى آخر رسالة</string>
+    <string name="you">أنت</string>
+    <string name="new_message_hidden">رسالة جديدة</string>
+    <string name="settings_smart">ميزات ذكية</string>
+    <string name="settings_privacy">الخصوصية والأمان</string>
+    <string name="settings_library">رسائلك</string>
+    <string name="select_text_hint">اضغط مطولاً على النص لتحديد جزء منه</string>
+    <string-array name="default_quick_replies">
+        <item>تمام 👍</item>
+        <item>في الطريق 🚗</item>
+        <item>بكلمك بعدين</item>
+        <item>مشغول الحين، أرد عليك قريب</item>
+        <item>شكراً لك 🙏</item>
+    </string-array>
 </resources>

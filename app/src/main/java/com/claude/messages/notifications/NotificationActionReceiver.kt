@@ -2,6 +2,12 @@ package com.claude.messages.notifications
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import com.claude.messages.R
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
@@ -47,6 +53,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
 
                     ACTION_DISMISS -> notifier.cancel(threadId)
+
+                    ACTION_COPY_CODE -> {
+                        val code = intent.getStringExtra(EXTRA_CODE).orEmpty()
+                        if (code.isNotEmpty()) {
+                            app.getSystemService(ClipboardManager::class.java)
+                                ?.setPrimaryClip(ClipData.newPlainText("code", code))
+                            Handler(Looper.getMainLooper()).post {
+                                Toast.makeText(
+                                    app,
+                                    app.getString(R.string.code_copied, code),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                        repo.markThreadRead(threadId)
+                        notifier.cancel(threadId)
+                    }
                 }
                 ServiceLocator.notifyDataChanged()
             } finally {
@@ -63,6 +86,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_MARK_READ = "com.claude.messages.action.MARK_READ"
         const val ACTION_DELETE = "com.claude.messages.action.DELETE"
         const val ACTION_DISMISS = "com.claude.messages.action.DISMISS"
+        const val ACTION_COPY_CODE = "com.claude.messages.action.COPY_CODE"
+        const val EXTRA_CODE = "code"
 
         private fun intentFor(context: Context, action: String, threadId: Long): PendingIntent {
             val intent = Intent(context, NotificationActionReceiver::class.java).apply {
@@ -85,6 +110,20 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
         fun markReadIntent(context: Context, threadId: Long) =
             intentFor(context, ACTION_MARK_READ, threadId)
+
+        fun copyCodeIntent(context: Context, threadId: Long, code: String): PendingIntent {
+            val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+                action = ACTION_COPY_CODE
+                putExtra(EXTRA_THREAD_ID, threadId)
+                putExtra(EXTRA_CODE, code)
+            }
+            return PendingIntent.getBroadcast(
+                context,
+                (ACTION_COPY_CODE + threadId).hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
 
         fun dismissIntent(context: Context, threadId: Long) =
             intentFor(context, ACTION_DISMISS, threadId)

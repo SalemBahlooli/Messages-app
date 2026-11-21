@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Scheduled messages: exact alarms where allowed, inexact otherwise. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:name=".MessagesApp"
@@ -90,13 +93,28 @@
                 <action android:name="com.claude.messages.action.REPLY" />
                 <action android:name="com.claude.messages.action.DELETE" />
                 <action android:name="com.claude.messages.action.DISMISS" />
+                <action android:name="com.claude.messages.action.COPY_CODE" />
             </intent-filter>
         </receiver>
 
         <receiver android:name=".sms.BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <receiver android:name=".sms.ScheduledSendReceiver" android:exported="false" />
+
+        <!-- Shares exported conversations without exposing app storage. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

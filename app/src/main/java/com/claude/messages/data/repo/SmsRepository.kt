@@ -185,6 +185,22 @@ class SmsRepository(private val context: Context) {
             out
         }
 
+    /** Every message (both directions) since [sinceMillis], for the insights screen. */
+    suspend fun loadAllSince(sinceMillis: Long, limit: Int = 20_000): List<Message> =
+        withContext(Dispatchers.IO) {
+            val out = mutableListOf<Message>()
+            runCatching {
+                resolver.query(
+                    Telephony.Sms.CONTENT_URI,
+                    SMS_PROJECTION,
+                    "${Telephony.Sms.DATE} >= ?",
+                    arrayOf(sinceMillis.toString()),
+                    "${Telephony.Sms.DATE} DESC LIMIT $limit",
+                )?.use { c -> while (c.moveToNext()) out += c.toMessage() }
+            }
+            out
+        }
+
     suspend fun searchMessages(query: String, limit: Int = 100): List<Message> =
         withContext(Dispatchers.IO) {
             if (query.isBlank()) return@withContext emptyList()
@@ -214,6 +230,7 @@ class SmsRepository(private val context: Context) {
         body: String,
         timestamp: Long,
         subId: Int,
+        read: Boolean = false,
     ): StoredMessage? {
         val threadId = threadIdFor(setOf(address))
         val values = ContentValues().apply {
@@ -221,8 +238,8 @@ class SmsRepository(private val context: Context) {
             put(Telephony.Sms.BODY, body)
             put(Telephony.Sms.DATE, timestamp)
             put(Telephony.Sms.DATE_SENT, timestamp)
-            put(Telephony.Sms.READ, 0)
-            put(Telephony.Sms.SEEN, 0)
+            put(Telephony.Sms.READ, if (read) 1 else 0)
+            put(Telephony.Sms.SEEN, if (read) 1 else 0)
             put(Telephony.Sms.TYPE, Message.TYPE_INBOX)
             if (threadId > 0) put(Telephony.Sms.THREAD_ID, threadId)
             if (subId >= 0) put(Telephony.Sms.SUBSCRIPTION_ID, subId)

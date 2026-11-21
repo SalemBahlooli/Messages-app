@@ -30,4 +30,13 @@ object PhoneNumbers {
     /** Short-code senders (banks, carriers) never appear in the phone book. */
     fun isShortCode(number: String): Boolean =
         number.filter { it.isDigit() }.length in 1..5 && !number.startsWith("+")
+
+    /**
+     * Identity used by the block list: the normalised digits for a phone
+     * number, or the lower-cased name for an alphanumeric sender like "STC".
+     */
+    fun blockKey(address: String): String {
+        val digits = normalize(address)
+        return if (digits.length >= 3) digits else address.trim().lowercase()
+    }
 }

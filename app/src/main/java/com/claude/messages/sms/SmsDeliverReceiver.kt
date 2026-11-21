@@ -6,7 +6,9 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.claude.messages.data.model.Message
+import com.claude.messages.data.db.ThreadMeta
 import com.claude.messages.di.ServiceLocator
+import com.claude.messages.util.PhoneNumbers
 import com.claude.messages.notifications.MessageNotifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,10 +39,26 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val db = ServiceLocator.database(app)
+                val blocked = runCatching {
+                    db.blockedDao().count(PhoneNumbers.blockKey(address)) > 0
+                }.getOrDefault(false)
+
+                // A blocked sender's message is still written — the default SMS
+                // app is the only one that can — but as read, archived and silent.
                 val stored = ServiceLocator.smsRepository(app)
-                    .insertIncoming(address, body, timestamp, subId)
+                    .insertIncoming(address, body, timestamp, subId, read = blocked)
                 if (stored == null) {
                     Log.w(TAG, "Could not persist incoming message")
+                    return@launch
+                }
+                if (blocked) {
+                    if (stored.threadId > 0) {
+                        val meta = db.threadMetaDao().get(stored.threadId)
+                            ?: ThreadMeta(threadId = stored.threadId)
+                        db.threadMetaDao().upsert(meta.copy(archived = true))
+                    }
+                    ServiceLocator.notifyDataChanged()
                     return@launch
                 }
                 MessageNotifier(app).notifyIncoming(
